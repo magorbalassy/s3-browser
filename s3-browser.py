@@ -95,7 +95,7 @@ def home():
     else:
         return json_response(str(args.mode))
 
-@app.rout('/', methods=['POST'])
+@app.route('/', methods=['POST'])
 def set_args():
     args = request.get_json()
     return json_response('OK')
