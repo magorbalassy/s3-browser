@@ -3,7 +3,7 @@ import boto3
 import logging
 import os
 
-from flask import Flask, jsonify, g
+from flask import Flask, jsonify, g, request
 
 logging.basicConfig(filename='s3-browser.log', level=logging.WARNING,
                     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -89,13 +89,16 @@ def json_response(msg):
   return response
 
 @app.route('/', methods=['GET'])
-def home():
-    
+def home():    
     if not args.endpoint:
         return json_response('None')
     else:
         return json_response(str(args.mode))
 
+@app.rout('/', methods=['POST'])
+def set_args():
+    args = request.get_json()
+    return json_response('OK')
 
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
