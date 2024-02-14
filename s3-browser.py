@@ -4,6 +4,8 @@ import logging
 import os
 
 from flask import Flask, jsonify, g, request
+from jinja2 import Template
+from botocore.exceptions import NoCredentialsError
 
 logging.basicConfig(filename='s3-browser.log', level=logging.WARNING,
                     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -14,14 +16,36 @@ app = Flask(__name__)
 
 class S3Browser:
     
+    '''A simple S3 browser class that lists buckets, objects and calculates the total size of the objects in the bucket.
+    
+    Attributes:
+        endpoint_url (str): The URL of the S3 endpoint
+        access_key (str): The AWS access key
+        secret_key (str): The AWS secret key
+        s3_resource (S3Resource): The S3 resource object
+        bucket_name (str): The name of the S3 bucket
+    Methods:
+        list_buckets(): Lists all the S3 buckets
+        calculate_total_size(): Calculates the total size of all objects in the S3 bucket
+        calculate_folder_size(folder_path): Calculates the total size of all objects in the specified folder
+        list_bucket_objects(): Lists all objects in the S3 bucket
+    '''
     bucket_name = ''
     
     def __init__(self, endpoint_url, access_key, secret_key):
+        self.buckets = []
         self.s3_resource = boto3.resource('s3', 
             endpoint_url=endpoint_url, 
             aws_access_key_id=access_key, 
             aws_secret_access_key=secret_key)
-
+        self.buckets = self.list_buckets()
+        
+    def list_buckets(self):
+        buckets = []
+        for bucket in self.s3_resource.buckets.all():
+            buckets.append(bucket.name)
+        return buckets
+    
     def calculate_total_size(self):
         total_size = 0
 
@@ -41,7 +65,19 @@ class S3Browser:
             total_size += obj.size
 
         return total_size
-
+    
+    def list_bucket_objects(self):
+        objects = []
+        bucket = self.s3_resource.Bucket(self.bucket_name)
+        for obj in bucket.objects.all():
+            obj_json = {
+                'key': obj.key,
+                'size': obj.size,
+                'last_modified': obj.last_modified
+                }
+            objects.append(obj_json)
+        return objects
+    
 class ArgumentParser:
     
     args = False
@@ -88,18 +124,60 @@ def json_response(msg):
   response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
   return response
 
+# 404 error for non-existing URLs.
+@app.errorhandler(404)
+def page_not_found(e):
+    template = Template('''
+      Error {{ code }} : The requested page does not exist.
+    ''')
+    return template.render(code=404)
+
+@app.route('/', methods=['OPTIONS'])
+def return_headers():
+    return json_response('')
+
 @app.route('/', methods=['GET'])
 def home():    
-    if not args.endpoint:
-        return json_response('None')
+    if 's3_browser' not in app.config:
+        return json_response([])
     else:
-        return json_response(str(args.mode))
+        return json_response(app.config['s3_browser'].list_buckets())
 
 @app.route('/', methods=['POST'])
 def set_args():
-    args = request.get_json()
-    return json_response('OK')
+    '''Set the S3 endpoint, access key and secret key, create the S3 browser object,
+    and in case of success, list the buckets.
+    '''
+    res = request.get_json()
+    args.endpoint = res["endpoint"]
+    args.access_key = res["key"]
+    args.secret_key = res["secret"]
+    try:
+        s3 = S3Browser(args.endpoint, args.access_key, args.secret_key)
+    except NoCredentialsError as e:
+        logging.error(e)
+        return json_response('Fail'),404
+    app.config['s3_browser'] = s3
+    return app.config['s3_browser'].list_buckets()
 
+@app.route('/buckets', methods=['GET'])
+def buckets():
+    if 's3_browser' in app.config:
+        return json_response(app.config['s3_browser'].buckets)
+    else:
+        return json_response(None)    
+
+
+@app.route('/objects', methods=['GET'])
+def objects():
+    # At the moment no checks are made as this endpoint should be used
+    # only if the S3 browser object is set.
+    if 's3_browser' in app.config:
+        s3_browser = app.config['s3_browser']
+        return json_response(s3_browser.list_bucket_objects())
+    else:
+        return json_response(None)
+    
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
     global args 
@@ -116,4 +194,6 @@ if __name__ == "__main__":
         else:
             print(s3_browser.calculate_folder_size(args.folder_path))
     if args.mode == 'ui':
+        if args.endpoint and args.access_key and args.secret_key:
+            app.config['s3_browser'] = S3Browser(args.endpoint, args.access_key, args.secret_key)
         app.run(debug=True, host='0.0.0.0', port='5001')
