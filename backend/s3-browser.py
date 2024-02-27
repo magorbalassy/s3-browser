@@ -5,7 +5,7 @@ import os
 
 from flask import Flask, jsonify, g, request
 from jinja2 import Template
-from botocore.exceptions import NoCredentialsError
+from botocore.exceptions import EndpointResolutionError, EndpointConnectionError, ClientError
 
 logging.basicConfig(filename='s3-browser.log', level=logging.WARNING,
                     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -148,15 +148,28 @@ def set_args():
     '''Set the S3 endpoint, access key and secret key, create the S3 browser object,
     and in case of success, list the buckets.
     '''
-    res = request.get_json()
-    args.endpoint = res["endpoint"]
-    args.access_key = res["key"]
-    args.secret_key = res["secret"]
+    req = request.get_json()
+    args.endpoint = req["endpoint"]
+    args.access_key = req["key"]
+    args.secret_key = req["secret"]
     try:
         s3 = S3Browser(args.endpoint, args.access_key, args.secret_key)
-    except NoCredentialsError as e:
+    except ClientError as e:
         logging.error(e)
-        return json_response('Fail'),404
+        if 'InvalidBucketName' in str(e) or 'NoSuchBucket' in str(e):
+            return json_response(['BucketError']),200
+        elif 'InvalidAccessKeyId' in str(e) or 'SignatureDoesNotMatch' in str(e):
+            return json_response(['AccessError']),200
+        return json_response(['ClientError']),200
+    except EndpointConnectionError as e:
+        logging.error(e)
+        return json_response(['EndpointConnectionError']),200
+    except EndpointResolutionError as e:
+        logging.error(e)
+        return json_response(['EndpointResolutionError']),200
+    except:
+        logging.error('Unknown error')
+        return json_response(['UnknownError']),200
     app.config['s3_browser'] = s3
     return app.config['s3_browser'].list_buckets()
 
