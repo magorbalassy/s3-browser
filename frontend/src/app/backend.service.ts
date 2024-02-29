@@ -2,6 +2,10 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export interface Reply {
+  status: string;
+  message: string[];
+}
 
 @Injectable({
   providedIn: 'root'
@@ -12,14 +16,14 @@ export class BackendService {
 
   constructor(private http: HttpClient) { }
 
-  getBuckets(): Observable<string[]> {
-    return this.http.get<string[]>(this.url);  
+  getBuckets(): Observable<Reply> {
+    return this.http.get<Reply>(this.url);  
   }
 
-  connect(endpoint: string, key: string, secret: string): Observable<string[]> {
+  connect(endpoint: string, key: string, secret: string): Observable<Reply> {
     const headers = { 'content-type': 'application/json'};
     console.log('connect', {"endpoint" : endpoint, "key":key, "secret":secret});
-    return this.http.post<string[]>(this.url,
+    return this.http.post<Reply>(this.url,
       {"endpoint" : endpoint, "key":key, "secret":secret},
       {headers});
   }

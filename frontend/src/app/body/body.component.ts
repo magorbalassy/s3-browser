@@ -21,10 +21,10 @@ import { CredentialsDialogComponent, DialogData } from '../credentials-dialog/cr
 export class BodyComponent implements OnInit{
   title = 'S3 Browser';
   buckets : string[] = [];
-  endpoint : string='';
+  endpoint : string='http://192.168.10.5:9000';
   bucket : string='';
-  access_key : string='';
-  secret_key : string='';
+  access_key : string='rTtWbGeGvCWI0j6fACjE';
+  secret_key : string='NI9XvLcC08RWJWMIUOyMlgB3FTELbKJktie3HdpC';
 
   constructor(private backendService: BackendService, 
     private snackBar: MatSnackBar,
@@ -44,17 +44,19 @@ export class BodyComponent implements OnInit{
     this.backendService.connect(this.endpoint,this.access_key,this.secret_key)
     .subscribe( data  => {
       console.log('data:', data)
-      if (errors.hasOwnProperty(data[0])) {
-        setTimeout(() => {
+      if (data.status == 'Error') {
+        if (errors.hasOwnProperty(data.message[0] as keyof typeof errors)) {
+          setTimeout(() => {
+            open_snack.dismiss();
+            this.openSnackBar(errors[data.message[0] as keyof typeof errors] + this.endpoint,'Close','red-snackbar');
+            this.openDialog();
+          }, 200);
+        }
+        else {
           open_snack.dismiss();
-          this.openSnackBar(errors[data[0] as keyof typeof errors] + this.endpoint,'Close','red-snackbar');
+          this.openSnackBar('Failed to connect to ' + this.endpoint,'Close','red-snackbar');
           this.openDialog();
-        }, 200);
-      }
-
-      else {
-        open_snack.dismiss();
-        this.openSnackBar('Failed to connect to ' + this.endpoint,'Close','red-snackbar');
+        }
       }
     });
   }
@@ -62,7 +64,7 @@ export class BodyComponent implements OnInit{
   openDialog(): void {
     if (this.buckets.length === 0) {
       const dialogRef = this.dialog.open(CredentialsDialogComponent, {
-        width: '450px',
+        width: '30%',
         data: {endpoint: this.endpoint, access_key: this.access_key, secret_key: this.secret_key}
       });
 
@@ -98,11 +100,11 @@ export class BodyComponent implements OnInit{
     this.backendService.getBuckets()
     .subscribe( data  => {
       console.log('data:', data)
-      if (data.length == 0) {
+      if (data.status == 'Error') {
         this.openDialog();
       }
       else {
-        this.buckets = data;
+        this.buckets = data.message;
       }
     });
   }
