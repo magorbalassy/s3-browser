@@ -159,19 +159,19 @@ def set_args():
     except ClientError as e:
         logging.error(e)
         if 'InvalidBucketName' in str(e) or 'NoSuchBucket' in str(e):
-            return json_response('Error','BucketError'),200
+            return json_response('Error',['BucketError']),200
         elif 'InvalidAccessKeyId' in str(e) or 'SignatureDoesNotMatch' in str(e):
-            return json_response('Error','AccessError'),200
-        return json_response('Error','ClientError'),200
+            return json_response('Error',['AccessError']),200
+        return json_response('Error',['ClientError']),200
     except EndpointConnectionError as e:
         logging.error(e)
-        return json_response('Error','EndpointConnectionError'),200
+        return json_response('Error',['EndpointConnectionError']),200
     except EndpointResolutionError as e:
         logging.error(e)
-        return json_response('Error','EndpointResolutionError'),200
+        return json_response('Error',['EndpointResolutionError']),200
     except:
         logging.error('Unknown error')
-        return json_response('Error','UnknownError'),200
+        return json_response('Error',['UnknownError']),200
     app.config['s3_browser'] = s3
     return json_response('Ok',app.config['s3_browser'].list_buckets())
 
