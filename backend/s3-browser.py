@@ -117,8 +117,10 @@ class ArgumentParser:
 
         return args
 
-def json_response(msg):
-  response = jsonify(msg)
+def json_response(status, msg):
+  response = jsonify({
+      "status":status,
+      "message": msg})
   response.headers.add('Access-Control-Allow-Origin', '*')
   response.headers.add('Access-Control-Allow-Headers', '*')
   response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
@@ -134,14 +136,14 @@ def page_not_found(e):
 
 @app.route('/', methods=['OPTIONS'])
 def return_headers():
-    return json_response('')
+    return json_response('Ok', 'Preflight request accepted.')
 
 @app.route('/', methods=['GET'])
 def home():    
     if 's3_browser' not in app.config:
-        return json_response([])
+        return json_response('Error', None)
     else:
-        return json_response(app.config['s3_browser'].list_buckets())
+        return json_response('Ok', app.config['s3_browser'].list_buckets())
 
 @app.route('/', methods=['POST'])
 def set_args():
@@ -157,28 +159,28 @@ def set_args():
     except ClientError as e:
         logging.error(e)
         if 'InvalidBucketName' in str(e) or 'NoSuchBucket' in str(e):
-            return json_response(['BucketError']),200
+            return json_response('Error','BucketError'),200
         elif 'InvalidAccessKeyId' in str(e) or 'SignatureDoesNotMatch' in str(e):
-            return json_response(['AccessError']),200
-        return json_response(['ClientError']),200
+            return json_response('Error','AccessError'),200
+        return json_response('Error','ClientError'),200
     except EndpointConnectionError as e:
         logging.error(e)
-        return json_response(['EndpointConnectionError']),200
+        return json_response('Error','EndpointConnectionError'),200
     except EndpointResolutionError as e:
         logging.error(e)
-        return json_response(['EndpointResolutionError']),200
+        return json_response('Error','EndpointResolutionError'),200
     except:
         logging.error('Unknown error')
-        return json_response(['UnknownError']),200
+        return json_response('Error','UnknownError'),200
     app.config['s3_browser'] = s3
-    return app.config['s3_browser'].list_buckets()
+    return json_response('Ok',app.config['s3_browser'].list_buckets())
 
 @app.route('/buckets', methods=['GET'])
 def buckets():
     if 's3_browser' in app.config:
-        return json_response(app.config['s3_browser'].buckets)
+        return json_response('Ok', app.config['s3_browser'].buckets)
     else:
-        return json_response(None)    
+        return json_response('Error', None)    
 
 
 @app.route('/objects', methods=['GET'])
@@ -187,9 +189,9 @@ def objects():
     # only if the S3 browser object is set.
     if 's3_browser' in app.config:
         s3_browser = app.config['s3_browser']
-        return json_response(s3_browser.list_bucket_objects())
+        return json_response('Ok', s3_browser.list_bucket_objects())
     else:
-        return json_response(None)
+        return json_response('Error', None)
     
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
