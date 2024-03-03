@@ -69,7 +69,7 @@ class S3Browser:
     def list_bucket_objects(self):
         objects = []
         bucket = self.s3_resource.Bucket(self.bucket_name)
-        for obj in bucket.objects.all():
+        for obj in bucket.objects.all(Delimiter='/'):
             obj_json = {
                 'key': obj.key,
                 'size': obj.size,
