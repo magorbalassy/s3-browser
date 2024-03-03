@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { BackendService } from '../backend.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +8,8 @@ import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { CredentialsDialogComponent, DialogData } from '../credentials-dialog/credentials-dialog.component';
+import { AppService } from '../app.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-body',
@@ -25,10 +27,16 @@ export class BodyComponent implements OnInit{
   bucket : string='';
   access_key : string='rTtWbGeGvCWI0j6fACjE';
   secret_key : string='NI9XvLcC08RWJWMIUOyMlgB3FTELbKJktie3HdpC';
+  subscription: Subscription;
 
-  constructor(private backendService: BackendService, 
+  constructor(private appService: AppService,
+    private backendService: BackendService, 
     private snackBar: MatSnackBar,
-    public dialog: MatDialog) {  }
+    public dialog: MatDialog) 
+  { 
+    this.subscription = appService.getBucket.subscribe(bucket => {
+      this.bucket = bucket;});
+  }
   
   connect() {
     let errors = {
@@ -57,6 +65,18 @@ export class BodyComponent implements OnInit{
           this.openSnackBar('Failed to connect to ' + this.endpoint,'Close','red-snackbar');
           this.openDialog();
         }
+      }
+      else if (data.status == 'Ok') {
+        open_snack.dismiss();
+        this.openSnackBar('Connected to ' + this.endpoint,'Close','green-snackbar');
+        this.buckets = data.message;
+        if (this.buckets.length === 1) {
+          this.bucket = this.buckets[0];
+        }
+        this.appService.getBucket.subscribe(bucket => {
+          this.bucket = bucket;
+        });
+        this.appService.setBuckets(this.buckets);
       }
     });
   }
@@ -105,8 +125,13 @@ export class BodyComponent implements OnInit{
       }
       else {
         this.buckets = data.message;
+        this.appService.setBuckets(this.buckets);
       }
     });
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
   }
 
 }

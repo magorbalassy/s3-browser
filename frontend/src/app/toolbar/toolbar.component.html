@@ -1,12 +1,17 @@
 <mat-toolbar color="primary">
-    <span>S3 Browser</span>
+    <span>S3 Browser 
+        @if (selectedBucket) {
+            - {{selectedBucket}}
+        }
+    </span>
     <span class="fill-remaining-space"></span>
     <span class="top-space">
         <mat-form-field>
             <mat-label color="accent">Bucket</mat-label>
-            <mat-select color="accent">
-                <mat-option value="us-east-1">us-east-1</mat-option>
-                <mat-option value="us-west-1" color="accent">us-west-1</mat-option>
+            <mat-select [(value)]="selectedBucket" (selectionChange)="onBucketChange($event)" color="accent">
+                @for (bucket of buckets; track bucket) {
+                    <mat-option color="red" value="{{bucket}}">{{bucket}}</mat-option>
+                }     
             </mat-select>
         </mat-form-field>
     </span>

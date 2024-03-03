@@ -20,6 +20,10 @@ export class BackendService {
     return this.http.get<Reply>(this.url);  
   }
 
+  getObject(bucket: string, key: string=''): Observable<Reply> {
+    return this.http.get<Reply>(this.url + bucket + '/' + key);
+  }
+
   connect(endpoint: string, key: string, secret: string): Observable<Reply> {
     const headers = { 'content-type': 'application/json'};
     console.log('connect', {"endpoint" : endpoint, "key":key, "secret":secret});
