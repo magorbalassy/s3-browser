@@ -1,0 +1,48 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the UI source code 
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: S3 Browser CI
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: "./frontend/package-lock.json"
+
+    - name: npm dependencies
+      run: npm install
+      working-directory: frontend
+      
+    - run: npm run build --if-present
+      working-directory: frontend
+
+    - name: copy build to backend folder
+      run: mkdir backend/frontend; cp -Rv frontend/dist/s3-browser/* backend/frontend/
+        
+    - name: Build the Docker image
+      run: docker build --tag s3-browser:0.1 .
+      
+    - name: Publish to Registry
+      uses: elgohr/Publish-Docker-Github-Action@v5
+      with:
+        name: magorbalassy/s3-browser
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
