@@ -1,0 +1,15 @@
+<div class="content">
+<mat-card>
+    <mat-card-title>
+        <h4>Browse S3 bucket {{this.bucket}}</h4>
+    </mat-card-title>
+    @if (buckets.length > 0) {
+        {{this.bucket}}
+    }
+    @else {
+        <mat-card-content>
+            <p>Setup connection and select a bucket to browse</p>
+        </mat-card-content>
+    }
+</mat-card>
+</div>

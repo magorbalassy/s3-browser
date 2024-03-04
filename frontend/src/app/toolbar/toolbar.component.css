@@ -1,0 +1,10 @@
+.fill-remaining-space {
+    /* This fills the remaining space, by using flexbox. 
+    Every toolbar row uses a flexbox row layout. */
+    flex: 1 1 auto;
+}
+
+.top-space {
+    /* This adds a top margin to the toolbar. */
+    margin-top: 20px;
+}
