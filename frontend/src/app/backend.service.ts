@@ -20,7 +20,7 @@ export class BackendService {
     return this.http.get<Reply>(this.url);  
   }
 
-  getObject(bucket: string, key: string=''): Observable<Reply> {
+  getObjects(bucket: string, key: string=''): Observable<Reply> {
     return this.http.get<Reply>(this.url + bucket + '/' + key);
   }
 
