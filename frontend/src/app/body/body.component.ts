@@ -28,6 +28,7 @@ export class BodyComponent implements OnInit{
   access_key : string='rTtWbGeGvCWI0j6fACjE';
   secret_key : string='NI9XvLcC08RWJWMIUOyMlgB3FTELbKJktie3HdpC';
   subscription: Subscription;
+  objects = [];
 
   constructor(private appService: AppService,
     private backendService: BackendService, 
@@ -35,11 +36,16 @@ export class BodyComponent implements OnInit{
     public dialog: MatDialog) 
   { 
     this.subscription = appService.getBucket.subscribe(bucket => {
-      this.bucket = bucket;});
+      this.bucket = bucket;
+      backendService.getObjects(this.bucket, '')
+        .subscribe( data  => {
+          console.log('data:', data);
+        });
+    });
   }
   
   connect() {
-    let errors = {
+    let errors : object = {
       'ClientError': 'Client access error for ',
       'AccessError': 'Invalid access or secret key for ',
       'EndpointConnectionError': 'Failed to connect to ',
