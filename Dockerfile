@@ -18,7 +18,7 @@ ENV PYTHONUNBUFFERED 1
 RUN pip install --upgrade pip
 RUN mkdir -p /app/frontend/assets
 COPY backend/frontend/* /app/frontend/
-COPY backend/frontend/assets/* /app/frontend/assets
+#COPY backend/frontend/assets/* /app/frontend/assets
 COPY backend/s3-browser.py /app/app.py
 COPY backend/requirements.txt /app/
 COPY backend/appentry.sh /app/
