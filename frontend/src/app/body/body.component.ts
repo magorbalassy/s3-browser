@@ -9,7 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { CredentialsDialogComponent, DialogData } from '../credentials-dialog/credentials-dialog.component';
 import { AppService } from '../app.service';
-import { Subscription } from 'rxjs';
+import { Subscription, catchError, of } from 'rxjs';
 
 @Component({
   selector: 'app-body',
@@ -51,12 +51,19 @@ export class BodyComponent implements OnInit{
       'EndpointConnectionError': 'Failed to connect to ',
       'EndpointResolutionError': 'Failed to resolve endpoint for ',
       'BucketError': 'Bucket name should not be specified in the URI for ',
-      'UnknownError': 'Unknown error occurred when trying to connect to '
+      'UnknownError': 'Unknown error occurred when trying to connect to ',
+      'APIError': 'Error connecting to the API create the connection for '
     }
     console.log('connect', this.endpoint, this.bucket, this.access_key, this.secret_key);
     var open_snack = this.openSnackBar('Connecting to ' + this.endpoint,'Close','green-snackbar');
     this.backendService.connect(this.endpoint,this.access_key,this.secret_key)
-    .subscribe( data  => {
+    .pipe(
+      catchError(error => {
+        console.log('My error log', error);
+        return of({'status': 'Error', 'message': ['APIError']}); // Return an Observable with a null value
+      })
+    )
+    .subscribe( data  => { 
       console.log('data:', data)
       if (data.status == 'Error') {
         if (errors.hasOwnProperty(data.message[0] as keyof typeof errors)) {
@@ -123,17 +130,7 @@ export class BodyComponent implements OnInit{
   }
   
   ngOnInit(): void {
-    this.backendService.getBuckets()
-    .subscribe( data  => {
-      console.log('data:', data)
-      if (data.status == 'Error') {
-        this.openDialog();
-      }
-      else {
-        this.buckets = data.message;
-        this.appService.setBuckets(this.buckets);
-      }
-    });
+    this.openDialog();
   }
 
   ngOnDestroy() {
@@ -141,3 +138,5 @@ export class BodyComponent implements OnInit{
   }
 
 }
+
+
