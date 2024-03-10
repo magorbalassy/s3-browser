@@ -3,7 +3,8 @@ import boto3
 import logging
 import os
 
-from flask import Flask, jsonify, g, request
+from flask import Flask, jsonify, request, session
+from flask_session import Session
 from jinja2 import Template
 from botocore.exceptions import EndpointResolutionError, EndpointConnectionError, ClientError
 
@@ -13,6 +14,9 @@ logging.basicConfig(filename='s3-browser.log', level=logging.WARNING,
 logging.info('==== Starting new run ====')
     
 app = Flask(__name__)
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_PERMANENT"] = False
+Session(app)
 
 class S3Browser:
     
@@ -143,7 +147,7 @@ def home():
     if 's3_browser' not in app.config:
         return json_response('Error', None)
     else:
-        return json_response('Ok', app.config['s3_browser'].list_buckets())
+        return json_response('Ok', session['s3_browser'].list_buckets())
 
 @app.route('/', methods=['POST'])
 def set_args():
@@ -172,13 +176,13 @@ def set_args():
     except:
         logging.error('Unknown error')
         return json_response('Error',['UnknownError']),200
-    app.config['s3_browser'] = s3
-    return json_response('Ok',app.config['s3_browser'].list_buckets())
+    session['s3_browser'] = s3
+    return json_response('Ok',session['s3_browser'].list_buckets())
 
 @app.route('/buckets', methods=['GET'])
 def buckets():
     if 's3_browser' in app.config:
-        return json_response('Ok', app.config['s3_browser'].buckets)
+        return json_response('Ok', session['s3_browser'].buckets)
     else:
         return json_response('Error', None)    
 
@@ -188,8 +192,7 @@ def objects():
     # At the moment no checks are made as this endpoint should be used
     # only if the S3 browser object is set.
     if 's3_browser' in app.config:
-        s3_browser = app.config['s3_browser']
-        return json_response('Ok', s3_browser.list_bucket_objects())
+        return json_response('Ok', session['s3_browser'].list_bucket_objects())
     else:
         return json_response('Error', None)
     
@@ -209,6 +212,7 @@ if __name__ == "__main__":
         else:
             print(s3_browser.calculate_folder_size(args.folder_path))
     if args.mode == 'ui':
-        if args.endpoint and args.access_key and args.secret_key:
-            app.config['s3_browser'] = S3Browser(args.endpoint, args.access_key, args.secret_key)
         app.run(debug=True, host='0.0.0.0', port='5001')
+        if args.endpoint and args.access_key and args.secret_key:
+            session['s3_browser'] = S3Browser(args.endpoint, args.access_key, args.secret_key)
+        
