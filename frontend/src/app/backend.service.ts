@@ -1,10 +1,17 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { Object } from './models';
 
 export interface Reply {
   status: string;
   message: string[];
+}
+
+export interface Session {
+  status: string;
+  bucket: string;
+  buckets: string[];
 }
 
 @Injectable({
@@ -16,12 +23,22 @@ export class BackendService {
 
   constructor(private http: HttpClient) { }
 
-  getBuckets(): Observable<Reply> {
-    return this.http.get<Reply>(this.url);  
+  setBucket(bucket: string): Observable<Reply> {
+    return this.http.post<Reply>(this.url + 'bucket',
+      {'bucket': bucket},
+      {withCredentials: true});
   }
 
-  getObjects(bucket: string, key: string=''): Observable<Reply> {
-    return this.http.get<Reply>(this.url + bucket + '/' + key);
+  getObjects(prefix: string=''): Observable<Object[]> {
+    let params = new HttpParams()
+      .set('prefix', prefix);
+    return this.http.get<Object[]>(this.url + 'objects', 
+                      {params:params, withCredentials: true}); 
+  }
+
+  getSession(): Observable<Session> {
+    console.log('getSession');
+    return this.http.get<Session>(this.url, {withCredentials: true});
   }
 
   connect(endpoint: string, key: string, secret: string): Observable<Reply> {
@@ -29,6 +46,7 @@ export class BackendService {
     console.log('connect', {"endpoint" : endpoint, "key":key, "secret":secret});
     return this.http.post<Reply>(this.url,
       {"endpoint" : endpoint, "key":key, "secret":secret},
-      {headers});
+      {withCredentials: true, headers: headers});
   }
+
 }
