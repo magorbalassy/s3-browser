@@ -3,16 +3,21 @@ import boto3
 import logging
 import os
 
-from flask import Flask, jsonify, g, request
-from jinja2 import Template
+from flask import Flask, jsonify, request, session
+from flask_session import Session
+from flask_cors import CORS
 from botocore.exceptions import EndpointResolutionError, EndpointConnectionError, ClientError
 
-logging.basicConfig(filename='s3-browser.log', level=logging.WARNING,
+logging.basicConfig(filename='s3-browser.log', level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 logging.info('==== Starting new run ====')
     
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'yololo24'
+
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
+# Session(app)
 
 class S3Browser:
     
@@ -30,19 +35,28 @@ class S3Browser:
         calculate_folder_size(folder_path): Calculates the total size of all objects in the specified folder
         list_bucket_objects(): Lists all objects in the S3 bucket
     '''
-    bucket_name = ''
     
     def __init__(self, endpoint_url, access_key, secret_key):
         self.buckets = []
-        self.s3_resource = boto3.resource('s3', 
-            endpoint_url=endpoint_url, 
-            aws_access_key_id=access_key, 
-            aws_secret_access_key=secret_key)
-        self.buckets = self.list_buckets()
+        self.endpoint_url = endpoint_url
+        self.access_key = access_key
+        self.secret_key = secret_key
+    
+    def s3_resource(self):
+        return boto3.resource('s3', 
+            endpoint_url=self.endpoint_url, 
+            aws_access_key_id=self.access_key, 
+            aws_secret_access_key=self.secret_key)
+        
+    def s3_client(self):
+        return boto3.client('s3', 
+            endpoint_url=self.endpoint_url, 
+            aws_access_key_id=self.access_key, 
+            aws_secret_access_key=self.secret_key)
         
     def list_buckets(self):
         buckets = []
-        for bucket in self.s3_resource.buckets.all():
+        for bucket in self.s3_resource().buckets.all():
             buckets.append(bucket.name)
         return buckets
     
@@ -50,7 +64,7 @@ class S3Browser:
         total_size = 0
 
         # List all objects in the S3 bucket
-        bucket = self.s3_resource.Bucket(self.bucket_name)
+        bucket = self.s3_resource().Bucket(self.bucket_name)
         for obj in bucket.objects.all():
             total_size += obj.size
 
@@ -60,22 +74,39 @@ class S3Browser:
         total_size = 0
 
         # List all objects in the specified folder
-        bucket = self.s3_resource.Bucket(self.bucket_name)
+        bucket = self.s3_resource().Bucket(self.bucket_name)
         for obj in bucket.objects.filter(Prefix=folder_path):
             total_size += obj.size
 
         return total_size
     
-    def list_bucket_objects(self):
+    def list_bucket_objects(self, bucket, folder_path=''):
         objects = []
-        bucket = self.s3_resource.Bucket(self.bucket_name)
-        for obj in bucket.objects.all(Delimiter='/'):
+        bucket = self.s3_resource().Bucket(bucket)
+        for obj in bucket.objects.filter(Prefix=folder_path):
             obj_json = {
                 'key': obj.key,
                 'size': obj.size,
                 'last_modified': obj.last_modified
                 }
             objects.append(obj_json)
+        return objects
+    
+    def list_bucket_objects_v2(self, bucket, folder_path=''):
+        objects = []
+        res = self.s3_client().list_objects_v2( \
+            Bucket=bucket, Delimiter='/', Prefix=folder_path)
+        if 'CommonPrefixes' in res:
+            for _ in res['CommonPrefixes']:
+                objects.append({'key' : _['Prefix'],
+                                'size': 0,
+                                'last_modified': None
+                                }) 
+        if 'Contents' in res:
+            objects = objects + [
+                { 'key':_['Key'], 
+                  'size': _['Size'],
+                  'last_modified': _['LastModified'] } for _ in res['Contents']]
         return objects
     
 class ArgumentParser:
@@ -121,29 +152,30 @@ def json_response(status, msg):
   response = jsonify({
       "status":status,
       "message": msg})
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  response.headers.add('Access-Control-Allow-Headers', '*')
-  response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+  #response.headers.add('Access-Control-Allow-Origin', '*')
+#   response.headers.add('Access-Control-Allow-Headers',"*")
+#   response.headers.add('Access-Control-Allow-Credentials', 'true')
+#   response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
   return response
 
-# 404 error for non-existing URLs.
-@app.errorhandler(404)
-def page_not_found(e):
-    template = Template('''
-      Error {{ code }} : The requested page does not exist.
-    ''')
-    return template.render(code=404)
 
+@app.route('/buckets', methods=['OPTIONS'])
+@app.route('/bucket', methods=['OPTIONS'])
 @app.route('/', methods=['OPTIONS'])
 def return_headers():
     return json_response('Ok', 'Preflight request accepted.')
 
 @app.route('/', methods=['GET'])
-def home():    
-    if 's3_browser' not in app.config:
-        return json_response('Error', None)
+def home():
+    session.clear()
+    if session:
+        response = {}
+        for key in session:
+            if key != 'access_key' and key != 'secret_key':
+                response[key] = session[key]
+        return response, 200
     else:
-        return json_response('Ok', app.config['s3_browser'].list_buckets())
+        return "", 404
 
 @app.route('/', methods=['POST'])
 def set_args():
@@ -154,14 +186,21 @@ def set_args():
     args.endpoint = req["endpoint"]
     args.access_key = req["key"]
     args.secret_key = req["secret"]
+    logging.info('Testing S3 connection...')
     try:
-        s3 = S3Browser(args.endpoint, args.access_key, args.secret_key)
+        s3_buckets = S3Browser(
+            args.endpoint, args.access_key, args.secret_key)\
+                .list_buckets()
+    except ConnectionRefusedError as e:
+        logging.error(e)
+        return json_response('Error',['ConnectionRefusedError']),200
     except ClientError as e:
         logging.error(e)
         if 'InvalidBucketName' in str(e) or 'NoSuchBucket' in str(e):
             return json_response('Error',['BucketError']),200
         elif 'InvalidAccessKeyId' in str(e) or 'SignatureDoesNotMatch' in str(e):
-            return json_response('Error',['AccessError']),200
+            logging.error('Access error')
+            return json_response('Error','AccessError'),200
         return json_response('Error',['ClientError']),200
     except EndpointConnectionError as e:
         logging.error(e)
@@ -169,29 +208,53 @@ def set_args():
     except EndpointResolutionError as e:
         logging.error(e)
         return json_response('Error',['EndpointResolutionError']),200
-    except:
-        logging.error('Unknown error')
+    except Exception as e:
+        logging.error('Unknown error ' + str(e))
         return json_response('Error',['UnknownError']),200
-    app.config['s3_browser'] = s3
-    return json_response('Ok',app.config['s3_browser'].list_buckets())
+    session['endpoint'] = args.endpoint
+    session['access_key'] = args.access_key
+    session['secret_key'] = args.secret_key
+    
+    session["buckets"] = s3_buckets
+    logging.info('S3 connection works, buckets listed and saved in session: '\
+        + str(s3_buckets))
+    return jsonify({"status": "Ok" ,"message": s3_buckets}), 200
+    #return json_response("OK" ,s3_buckets), 200
+
 
 @app.route('/buckets', methods=['GET'])
 def buckets():
-    if 's3_browser' in app.config:
-        return json_response('Ok', app.config['s3_browser'].buckets)
+    if 'buckets' not in session:
+        session["buckets"] = S3Browser(session["endpoint"], 
+                session["access_key"], session["secret_key"]).list_buckets()
+        return json_response('Ok', session["buckets"])
     else:
         return json_response('Error', None)    
 
+@app.route('/bucket', methods=['POST'])
+def set_bucket():
+    req = request.get_json()
+    session["bucket"] = req["bucket"]
+    logging.info('Bucket set to ' + session["bucket"])
+    return jsonify(session["bucket"]), 200
 
 @app.route('/objects', methods=['GET'])
 def objects():
     # At the moment no checks are made as this endpoint should be used
     # only if the S3 browser object is set.
-    if 's3_browser' in app.config:
-        s3_browser = app.config['s3_browser']
-        return json_response('Ok', s3_browser.list_bucket_objects())
-    else:
-        return json_response('Error', None)
+
+    prefix = request.args.get('prefix') if 'prefix' in request.args else ''
+    if 'bucket' in session:
+        bucket = session["bucket"]
+    logging.info('Listing objects in bucket ' + bucket \
+        + ' and prefix ' + request.args.get('prefix'))
+    if 'buckets' in session or True:
+        session['objects'] = S3Browser(session["endpoint"],
+                        session["access_key"],
+                        session["secret_key"])\
+            .list_bucket_objects_v2(bucket, prefix)
+        return session['objects'], 200
+
     
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
@@ -209,6 +272,4 @@ if __name__ == "__main__":
         else:
             print(s3_browser.calculate_folder_size(args.folder_path))
     if args.mode == 'ui':
-        if args.endpoint and args.access_key and args.secret_key:
-            app.config['s3_browser'] = S3Browser(args.endpoint, args.access_key, args.secret_key)
         app.run(debug=True, host='0.0.0.0', port='5001')
