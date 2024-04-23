@@ -221,7 +221,17 @@ def set_args():
     return jsonify({"status": "Ok" ,"message": s3_buckets}), 200
     #return json_response("OK" ,s3_buckets), 200
 
-
+@app.route('/size', methods=['GET'])
+def size():
+    if 'bucket' in session:
+        s3_browser = S3Browser(session["endpoint"], 
+            session["access_key"], session["secret_key"])
+        s3_browser.bucket_name = session["bucket"]
+        if 'prefix' in request.args:
+            return json_response('Ok', s3_browser.calculate_folder_size(request.args.get('prefix')))
+        else:
+            return json_response('Error', 'Bad request')
+        
 @app.route('/buckets', methods=['GET'])
 def buckets():
     if 'buckets' not in session:
