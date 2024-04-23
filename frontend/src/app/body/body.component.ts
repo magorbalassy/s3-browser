@@ -159,6 +159,28 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
     });
   }
 
+  getSizeOfFolder(prefix: string) {
+    console.log('getSizeOfFolder', this.bucket, prefix);
+    this.backendService.getSizeOfFolder(prefix)
+    .subscribe( data  => {
+      console.log('getSizeOfFolder reply from API:', data);
+      if (data.status == 'Error') {
+        this.openSnackBar('Failed to get size of folder ' + prefix, 'Close', 'red-snackbar');
+      }
+      else {
+        const num = parseInt(data.message[0]);
+        this.openSnackBar('Size of folder ' + prefix + ' is ' + num.toString(),  'Close', 'green-snackbar');
+        this.objects = this.objects.map(obj => 
+          obj.key === prefix
+          ? {...obj, size: num} 
+          : obj
+      );
+      console.log('Objects after size:', this.objects);  
+      }
+      //this.openSnackBar('Size of folder ' + prefix + ' is ' + data.size,'Close','green-snackbar');
+    });
+  }
+
   openSnackBar(message: string, action: string, className: string) {
     return this.snackBar.open(message, action, {
      duration: 10000,
