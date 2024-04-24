@@ -36,6 +36,7 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
   displayedColumns: string[] = ['key', 'size', 'last_modified'];
   dataSource = new MatTableDataSource<Object>(this.objects);
   dataLoaded = false;
+  currentFolder = '/';
   @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   constructor(private appService: AppService,
@@ -149,10 +150,24 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
 
   getObjects(prefix: string='') {
     console.log('getObjects', this.bucket, prefix);
+    if ((prefix !== '') && (prefix as string !== '..' as string)) {
+      this.currentFolder = this.currentFolder + prefix;
+    }
+    else if (prefix as string === '..' as string) {
+      let parts = this.currentFolder.split('/');
+      parts.pop();
+      parts.pop();
+      this.currentFolder = parts.join('/') + '/';
+      prefix = this.currentFolder === '/' ? '' : this.currentFolder;
+      console.log('Current folder:', this.currentFolder);
+    }
     this.backendService.getObjects(prefix)
     .subscribe( data  => {
       console.log('getObjects reply from API:', data);
       this.objects = data;
+      if (this.currentFolder !== '/') {
+        this.objects.unshift({'key': '..', 'last_modified': null, 'size': null, 'type': 'folder'});
+      }
       console.log('Objects:', this.objects);
       this.dataSource = new MatTableDataSource<Object>(this.objects);
       this.dataSource.paginator = this.paginator;
@@ -181,6 +196,7 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
       );
       console.log('Objects after size:', this.objects);
       this.dataSource = new MatTableDataSource<Object>(this.objects);
+      this.dataSource.paginator = this.paginator;
       }
       //this.openSnackBar('Size of folder ' + prefix + ' is ' + data.size,'Close','green-snackbar');
     });
