@@ -100,13 +100,15 @@ class S3Browser:
             for _ in res['CommonPrefixes']:
                 objects.append({'key' : _['Prefix'],
                                 'size': None,
-                                'last_modified': None
+                                'last_modified': None,
+                                'type': 'folder'
                                 }) 
         if 'Contents' in res:
             objects = objects + [
                 { 'key':_['Key'], 
                   'size': _['Size'],
-                  'last_modified': _['LastModified'] } for _ in res['Contents']]
+                  'last_modified': _['LastModified'],
+                  'type': 'object'} for _ in res['Contents']]
         return objects
     
 class ArgumentParser:
