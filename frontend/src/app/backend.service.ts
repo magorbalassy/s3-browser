@@ -8,6 +8,10 @@ export interface Reply {
   message: string[];
 }
 
+export interface Size {
+  size: number;
+}
+
 export interface Session {
   status: string;
   bucket: string;
@@ -41,13 +45,13 @@ export class BackendService {
     return this.http.get<Session>(this.url, {withCredentials: true});
   }
 
-  getSizeOfFolder(prefix: string): Observable<Reply> {
+  getSizeOfFolder(prefix: string): Observable<Size> {
     let params = new HttpParams()
       .set('prefix', prefix);
-    return this.http.get<Reply>(this.url + 'size', 
+    return this.http.get<Size>(this.url + 'size', 
                       {params:params, withCredentials: true}); 
   }
-  
+
   connect(endpoint: string, key: string, secret: string): Observable<Reply> {
     const headers = { 'content-type': 'application/json'};
     console.log('connect', {"endpoint" : endpoint, "key":key, "secret":secret});
