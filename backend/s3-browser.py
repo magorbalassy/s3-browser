@@ -99,7 +99,7 @@ class S3Browser:
         if 'CommonPrefixes' in res:
             for _ in res['CommonPrefixes']:
                 objects.append({'key' : _['Prefix'],
-                                'size': 0,
+                                'size': None,
                                 'last_modified': None
                                 }) 
         if 'Contents' in res:
@@ -228,9 +228,9 @@ def size():
             session["access_key"], session["secret_key"])
         s3_browser.bucket_name = session["bucket"]
         if 'prefix' in request.args:
-            return json_response('Ok', s3_browser.calculate_folder_size(request.args.get('prefix')))
+            return {"size" : s3_browser.calculate_folder_size(request.args.get('prefix'))}, 200
         else:
-            return json_response('Error', 'Bad request')
+            return {"size" : 0}, 404
         
 @app.route('/buckets', methods=['GET'])
 def buckets():
