@@ -1,4 +1,5 @@
 import { AfterViewInit, Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { BackendService } from '../backend.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatButtonModule } from '@angular/material/button';
@@ -17,7 +18,7 @@ import { Object } from '../models';
 @Component({
   selector: 'app-body',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, 
+  imports: [CommonModule, FormsModule, MatButtonModule, 
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatTableModule, MatPaginatorModule, CredentialsDialogComponent ],
   templateUrl: './body.component.html',
@@ -162,20 +163,24 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
   getSizeOfFolder(prefix: string) {
     console.log('getSizeOfFolder', this.bucket, prefix);
     this.backendService.getSizeOfFolder(prefix)
+    .pipe( catchError(error => {
+        console.log('No size ? ', error);
+        return of(null) // Return an Observable with a null value
+    }))
     .subscribe( data  => {
       console.log('getSizeOfFolder reply from API:', data);
-      if (data.status == 'Error') {
+      if (data == null) {
         this.openSnackBar('Failed to get size of folder ' + prefix, 'Close', 'red-snackbar');
       }
       else {
-        const num = parseInt(data.message[0]);
-        this.openSnackBar('Size of folder ' + prefix + ' is ' + num.toString(),  'Close', 'green-snackbar');
+        this.openSnackBar('Size of folder ' + prefix + ' is ' + data.size.toString(),  'Close', 'green-snackbar');
         this.objects = this.objects.map(obj => 
           obj.key === prefix
-          ? {...obj, size: num} 
+          ? {...obj, size: data.size} 
           : obj
       );
-      console.log('Objects after size:', this.objects);  
+      console.log('Objects after size:', this.objects);
+      this.dataSource = new MatTableDataSource<Object>(this.objects);
       }
       //this.openSnackBar('Size of folder ' + prefix + ' is ' + data.size,'Close','green-snackbar');
     });
