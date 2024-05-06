@@ -99,14 +99,16 @@ class S3Browser:
         if 'CommonPrefixes' in res:
             for _ in res['CommonPrefixes']:
                 objects.append({'key' : _['Prefix'],
-                                'size': 0,
-                                'last_modified': None
+                                'size': None,
+                                'last_modified': None,
+                                'type': 'folder'
                                 }) 
         if 'Contents' in res:
             objects = objects + [
                 { 'key':_['Key'], 
                   'size': _['Size'],
-                  'last_modified': _['LastModified'] } for _ in res['Contents']]
+                  'last_modified': _['LastModified'],
+                  'type': 'object'} for _ in res['Contents']]
         return objects
     
 class ArgumentParser:
@@ -221,7 +223,17 @@ def set_args():
     return jsonify({"status": "Ok" ,"message": s3_buckets}), 200
     #return json_response("OK" ,s3_buckets), 200
 
-
+@app.route('/size', methods=['GET'])
+def size():
+    if 'bucket' in session:
+        s3_browser = S3Browser(session["endpoint"], 
+            session["access_key"], session["secret_key"])
+        s3_browser.bucket_name = session["bucket"]
+        if 'prefix' in request.args:
+            return {"size" : s3_browser.calculate_folder_size(request.args.get('prefix'))}, 200
+        else:
+            return {"size" : 0}, 404
+        
 @app.route('/buckets', methods=['GET'])
 def buckets():
     if 'buckets' not in session:
