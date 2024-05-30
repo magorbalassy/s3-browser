@@ -258,14 +258,15 @@ def objects():
     prefix = request.args.get('prefix') if 'prefix' in request.args else ''
     if 'bucket' in session:
         bucket = session["bucket"]
-    logging.info('Listing objects in bucket ' + bucket \
-        + ' and prefix ' + request.args.get('prefix'))
-    if 'buckets' in session or True:
+        logging.info('Listing objects in bucket ' + bucket \
+            + ' and prefix ' + request.args.get('prefix'))
         session['objects'] = S3Browser(session["endpoint"],
                         session["access_key"],
                         session["secret_key"])\
             .list_bucket_objects_v2(bucket, prefix)
         return session['objects'], 200
+    else:
+        return jsonify('Error'), 404
 
     
 if __name__ == "__main__":
