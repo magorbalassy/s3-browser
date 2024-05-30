@@ -191,7 +191,7 @@ def set_args():
     logging.info('Testing S3 connection...')
     try:
         s3_buckets = S3Browser(
-            args.endpoint, args.access_key, args.secret_key)\
+            session['endpoint'], session['access_key'], session['secret_key'])\
                 .list_buckets()
     except ConnectionRefusedError as e:
         logging.error(e)
