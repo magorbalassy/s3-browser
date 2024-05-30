@@ -24,7 +24,7 @@ export interface Session {
 export class BackendService {
 
   //private url = 'http://localhost:5001/';
-  private url = '/api/'
+  private url = '/api/';
 
   constructor(private http: HttpClient) { }
 

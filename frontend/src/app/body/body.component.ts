@@ -60,6 +60,7 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
             }
             else if (data.status == 'Ok') {
               this.openSnackBar('Set bucket to ' + this.bucket,'Close','green-snackbar');
+              this.currentFolder = '/';
             }
             if (update) {
               this.getObjects('');
@@ -72,6 +73,7 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
   
   ngAfterViewInit() {
     this.dataSource.paginator = this.paginator;
+    this.dataSource.paginator.pageSize = 10; // Set default page size to 10
   }
 
   connect() {
