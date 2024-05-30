@@ -2,6 +2,8 @@
     <span>S3 Browser 
         @if (selectedBucket) {
             | Browsing bucket: {{selectedBucket}}
+        } @else {
+            | No bucket selected
         }
     </span>
     <span class="fill-remaining-space"></span>

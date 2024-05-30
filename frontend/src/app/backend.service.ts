@@ -34,10 +34,15 @@ export class BackendService {
   }
 
   getObjects(prefix: string=''): Observable<Object[]> {
-    let params = new HttpParams()
+    if (!prefix) {
+      let params = new HttpParams()
       .set('prefix', prefix);
-    return this.http.get<Object[]>(this.url + 'objects', 
-                      {params:params, withCredentials: true}); 
+      return this.http.get<Object[]>(this.url + 'objects', 
+                      {params:params, withCredentials: true});
+    } else {
+      return this.http.get<Object[]>(this.url + 'objects', 
+                      {withCredentials: true});
+    } 
   }
 
   getSession(): Observable<Session> {
