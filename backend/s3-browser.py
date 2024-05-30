@@ -185,9 +185,9 @@ def set_args():
     and in case of success, list the buckets.
     '''
     req = request.get_json()
-    args.endpoint = req["endpoint"]
-    args.access_key = req["key"]
-    args.secret_key = req["secret"]
+    session['endpoint'] = req["endpoint"]
+    session['access_key'] = req["key"]
+    session['secret_key'] = req["secret"]
     logging.info('Testing S3 connection...')
     try:
         s3_buckets = S3Browser(
@@ -213,10 +213,7 @@ def set_args():
     except Exception as e:
         logging.error('Unknown error ' + str(e))
         return json_response('Error',['UnknownError']),200
-    session['endpoint'] = args.endpoint
-    session['access_key'] = args.access_key
-    session['secret_key'] = args.secret_key
-    
+
     session["buckets"] = s3_buckets
     logging.info('S3 connection works, buckets listed and saved in session: '\
         + str(s3_buckets))
