@@ -23,8 +23,8 @@ export interface Session {
 })
 export class BackendService {
 
-  //private url = 'http://localhost:5001/';
-  private url = '/api/';
+  private url = 'http://localhost:5001/';
+  // private url = '/api/';
 
   constructor(private http: HttpClient) { }
 
@@ -35,7 +35,7 @@ export class BackendService {
   }
 
   getObjects(prefix: string=''): Observable<Object[]> {
-    if (!prefix) {
+    if (prefix) {
       let params = new HttpParams()
       .set('prefix', prefix);
       return this.http.get<Object[]>(this.url + 'objects', 
