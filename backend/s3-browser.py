@@ -211,17 +211,17 @@ def set_args():
         logging.error(e)
         return json_response('Error',['EndpointResolutionError']),200
     except Exception as e:
-        logging.error('Unknown error ' + str(e))
+        logging.error('Unknown error: %s', str(e))
         return json_response('Error',['UnknownError']),200
 
     session["buckets"] = s3_buckets
-    logging.info('S3 connection works, buckets listed and saved in session: '\
-        + str(s3_buckets))
+    logging.info('S3 connection works, buckets listed and saved in session: %s',\
+        str(s3_buckets))
     return jsonify({"status": "Ok" ,"message": s3_buckets}), 200
     #return json_response("OK" ,s3_buckets), 200
 
 @app.route('/size', methods=['GET'])
-def size():
+def size() -> dict:
     if 'bucket' in session:
         s3_browser = S3Browser(session["endpoint"], 
             session["access_key"], session["secret_key"])
@@ -244,7 +244,7 @@ def buckets():
 def set_bucket():
     req = request.get_json()
     session["bucket"] = req["bucket"]
-    logging.info('Bucket set to ' + session["bucket"])
+    logging.info('Bucket set to %s.', session["bucket"])
     return jsonify(session["bucket"]), 200
 
 @app.route('/objects', methods=['GET'])
@@ -254,9 +254,10 @@ def objects():
 
     prefix = request.args.get('prefix') if 'prefix' in request.args else ''
     if 'bucket' in session:
-        bucket = session["bucket"]
-        logging.info('Listing objects in bucket ' + bucket \
-            + ' and prefix ' + request.args.get('prefix'))
+        bucket:str = session["bucket"]
+        print(f'Bucket: {bucket} Prefix: {prefix}' )
+        logging.info("Listing objects in bucket %s and prefix %s",\
+                     bucket, prefix)
         session['objects'] = S3Browser(session["endpoint"],
                         session["access_key"],
                         session["secret_key"])\
@@ -268,7 +269,6 @@ def objects():
     
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
-    global args 
     args = arg_parser.parse_args()
 
 
