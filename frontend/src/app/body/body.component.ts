@@ -14,6 +14,7 @@ import { CredentialsDialogComponent, DialogData } from '../credentials-dialog/cr
 import { AppService } from '../app.service';
 import { Subscription, catchError, of } from 'rxjs';
 import { Object } from '../models';
+import { PageEvent } from '@angular/material/paginator';
 
 @Component({
   selector: 'app-body',
@@ -37,7 +38,10 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
   dataSource = new MatTableDataSource<Object>(this.objects);
   dataLoaded = false;
   currentFolder = '/';
+  previousFolder = '/';
   @ViewChild(MatPaginator) paginator!: MatPaginator;
+  pageSize: number = 10;
+  pageEvent: PageEvent | undefined;
 
   constructor(private appService: AppService,
     private backendService: BackendService, 
@@ -53,27 +57,51 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
         };
         console.log('Setting bucket:', this.bucket);
         backendService.setBucket(this.bucket)
-          .subscribe( data  => {
-            console.log('Setbucket reply from API:', data);
-            if (data.status == 'Error') {
-              this.openSnackBar('Failed to set bucket ' + this.bucket,'Close','red-snackbar');
-            }
-            else if (data.status == 'Ok') {
-              this.openSnackBar('Set bucket to ' + this.bucket,'Close','green-snackbar');
-              this.currentFolder = '/';
-            }
+        .pipe( catchError(error => {
+            console.log('Error setting bucket ? ', error);
+            return of('Error'); // Return an Observable with Error value
+        }))
+        .subscribe( data  => {
+          console.log('Setbucket reply from API:', data);
+          if (data == 'Error') {
+            this.openSnackBar('Failed to set bucket ' + this.bucket,'Close','red-snackbar');
+          }
+          else if (data == this.bucket) {
+            this.openSnackBar('Set bucket to ' + this.bucket,'Close','green-snackbar');
+            this.currentFolder = '/';
+            this.previousFolder = '/';
             if (update) {
+              this.objects = [];
               this.getObjects('');
+              this.loadData();
             }
-          });
+          }
+        });
       }
     });
 
   }
   
+  handlePageEvent(e: PageEvent) {
+    this.pageEvent = e;
+    this.pageSize = e.pageSize;
+  }
+
   ngAfterViewInit() {
+    this.dataSource = new MatTableDataSource<Object>(this.objects);
+    this.dataSource.paginator = this.paginator;  
+    this.dataSource.paginator.pageSize = this.pageSize; // Set default page size to 20
+    // this.paginator.page.subscribe((pageEvent: PageEvent) => {
+    //   console.log('Page size: ' + pageEvent.pageSize);
+    //   console.log('Page index: ' + pageEvent.pageIndex);
+    // });
+  }
+
+  loadData() {
+    this.dataSource = new MatTableDataSource<Object>(this.objects);
     this.dataSource.paginator = this.paginator;
-    this.dataSource.paginator.pageSize = 10; // Set default page size to 10
+    this.dataSource.paginator.pageSize = this.pageSize;
+    this.dataLoaded = true;
   }
 
   connect() {
@@ -151,8 +179,9 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
   }
 
   getObjects(prefix: string='') {
-    console.log('getObjects', this.bucket, prefix);
+    console.log('getObjects: Bucket: ',this.bucket,' Prefix:', prefix);
     if ((prefix !== '') && (prefix as string !== '..' as string)) {
+      this.previousFolder = this.currentFolder;
       this.currentFolder = this.currentFolder + prefix;
     }
     else if (prefix as string === '..' as string) {
@@ -163,7 +192,13 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
       prefix = this.currentFolder === '/' ? '' : this.currentFolder;
       console.log('Current folder:', this.currentFolder);
     }
+    console.log('prefix:', prefix, 'currentFolder:', this.currentFolder, 'previousFolder:', this.previousFolder)
     this.backendService.getObjects(prefix)
+    .pipe( catchError(error => {
+        console.log('Error fetching objects ? ', error);
+        this.currentFolder = this.previousFolder;
+        return of([]) // Return an Observable with a null value
+    }))
     .subscribe( data  => {
       console.log('getObjects reply from API:', data);
       this.objects = data;
@@ -171,9 +206,8 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
         this.objects.unshift({'key': '..', 'last_modified': null, 'size': null, 'type': 'folder'});
       }
       console.log('Objects:', this.objects);
-      this.dataSource = new MatTableDataSource<Object>(this.objects);
-      this.dataSource.paginator = this.paginator;
-      this.dataLoaded = true;
+      this.loadData();
+
     });
   }
 
@@ -198,7 +232,7 @@ export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
       );
       console.log('Objects after size:', this.objects);
       this.dataSource = new MatTableDataSource<Object>(this.objects);
-      this.dataSource.paginator = this.paginator;
+      this.loadData();
       }
       //this.openSnackBar('Size of folder ' + prefix + ' is ' + data.size,'Close','green-snackbar');
     });
