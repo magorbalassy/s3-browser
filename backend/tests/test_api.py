@@ -141,3 +141,4 @@ def test_spa_fallback(tmp_path, aws):
     assert "immutable" in asset.headers["cache-control"]
     assert client.get("/../../etc/passwd").text == "<app-root></app-root>"
     assert client.get("/api/nope").status_code == 404
+    assert client.head("/b/photos").status_code == 200

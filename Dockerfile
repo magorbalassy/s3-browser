@@ -1,53 +1,43 @@
-FROM  nginx:1.25.0
-LABEL maintainer="Magor Balassy"
+# syntax=docker/dockerfile:1
 
-USER root
+# ---- 1. Build the Angular app ----
+FROM node:22-alpine AS frontend
+WORKDIR /src
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
 
-RUN apt-get update
-RUN apt-get install -y python3 python3-pip
-RUN echo 'alias ll="ls -l"' >> ~/.bashrc
-
-# Set work directory
+# ---- 2. Install the backend into a virtualenv ----
+FROM python:3.13-slim AS backend
+COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY backend/s3_browser ./s3_browser
+RUN uv sync --frozen --no-dev --no-editable
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# ---- 3. Runtime: one uvicorn process serving the API and the app ----
+FROM python:3.13-slim
+LABEL org.opencontainers.image.title="s3-browser" \
+      org.opencontainers.image.description="Browse S3-compatible storage and calculate folder sizes" \
+      org.opencontainers.image.source="https://github.com/magorbalassy/s3-browser"
 
-# Install dependencies
-RUN pip install --upgrade pip
-RUN mkdir -p /app/frontend/assets
-COPY backend/frontend/* /app/frontend/
-#COPY backend/frontend/assets/* /app/frontend/assets
-COPY backend/s3-browser.py /app/app.py
-COPY backend/requirements.txt /app/
-COPY backend/appentry.sh /app/
-RUN chmod +x /app/appentry.sh
-RUN sed -i '$d' /docker-entrypoint.sh
-RUN echo "/app/appentry.sh" >> /docker-entrypoint.sh
-RUN echo 'exec "$@"' >>  /docker-entrypoint.sh
+RUN useradd --system --uid 10001 --no-create-home app
+WORKDIR /app
+COPY --from=backend /app/.venv /app/.venv
+COPY --from=frontend /src/dist/s3-browser/browser /app/static
 
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    STATIC_DIR=/app/static \
+    PORT=8080
 
-RUN pip install -r requirements.txt
+USER app
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+  CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/api/health', timeout=3)"]
 
-# Configure image with the app user and correct permissions
-# RUN groupadd appuser -f -g 1002 && \
-#     adduser -u 1002 --ingroup appuser appuser && \
-#     chown -R appuser:appuser /app && \
-#     chmod -R 755 /app
-
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/server.conf
-
-
-# User who will be running the application
-# USER appuser
-
-# Entrypoint specifies default command to execute when the image runs
-ENTRYPOINT ["/docker-entrypoint.sh"]
-
-EXPOSE 80
-
-STOPSIGNAL SIGQUIT
-
-CMD ["nginx", "-g", "daemon off;"]
+# Single worker on purpose: sessions are kept in memory.
+CMD ["s3-browser", "serve"]

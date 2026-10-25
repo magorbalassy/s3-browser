@@ -230,7 +230,7 @@ def _mount_spa(app: FastAPI, root: Path) -> None:
     """Serve the Angular build; unknown paths fall back to index.html for client routing."""
     index = root / "index.html"
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(path: str) -> FileResponse:
         candidate = (root / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(root):
