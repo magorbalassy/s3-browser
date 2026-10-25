@@ -1,2 +1,7 @@
 *.log
 backend/flask_session
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+backend/static/
