@@ -28,10 +28,10 @@ import { PageEvent } from '@angular/material/paginator';
 export class BodyComponent implements OnInit, OnDestroy, AfterViewInit{
   title = 'S3 Browser';
   buckets : string[] = [];
-  endpoint : string='http://192.168.10.5:9000';
+  endpoint : string='';
   bucket : string='';
-  access_key : string='rTtWbGeGvCWI0j6fACjE';
-  secret_key : string='NI9XvLcC08RWJWMIUOyMlgB3FTELbKJktie3HdpC';
+  access_key : string='';
+  secret_key : string='';
   subscription: Subscription;
   objects : Object[] = [];
   displayedColumns: string[] = ['key', 'size', 'last_modified'];
