@@ -1,0 +1,51 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.running,
+.failed,
+.done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.failed {
+  color: var(--mat-sys-error);
+
+  .muted {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.small {
+  --mat-icon-button-state-layer-size: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.recalc {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.done:hover .recalc,
+.recalc:focus-visible {
+  opacity: 1;
+}

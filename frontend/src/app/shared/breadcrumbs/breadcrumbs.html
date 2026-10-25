@@ -1,0 +1,19 @@
+<nav aria-label="Folder path">
+  <ol>
+    <li>
+      <a routerLink="/b" class="home" aria-label="All buckets">
+        <mat-icon>home_storage</mat-icon>
+      </a>
+    </li>
+    @for (crumb of crumbs(); track $index; let last = $last) {
+      <li>
+        <mat-icon class="sep" aria-hidden="true">chevron_right</mat-icon>
+        @if (last) {
+          <span aria-current="page">{{ crumb.label }}</span>
+        } @else {
+          <a [routerLink]="crumb.link">{{ crumb.label }}</a>
+        }
+      </li>
+    }
+  </ol>
+</nav>

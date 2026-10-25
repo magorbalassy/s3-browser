@@ -1,0 +1,110 @@
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  // Follows the OS by default; the theme toggle overrides color-scheme on <html>.
+  color-scheme: light dark;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}
+
+app-root {
+  display: block;
+  min-height: 100%;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'opsz' 24;
+}
+
+// Error snackbar (Notifier.error)
+.error-snackbar {
+  @include mat.snack-bar-overrides(
+    (
+      container-color: var(--mat-sys-error-container),
+      supporting-text-color: var(--mat-sys-on-error-container),
+      button-color: var(--mat-sys-on-error-container),
+    )
+  );
+}
+
+// ----- shared page layout -----
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+
+  h1 {
+    margin: 0;
+    font: var(--mat-sys-headline-small);
+  }
+}
+
+.subtitle,
+.muted {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 16px;
+  background: var(--mat-sys-surface-container-lowest);
+
+  > mat-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+  }
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 64px 16px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+
+  > mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+  }
+
+  &.error > mat-icon {
+    color: var(--mat-sys-error);
+  }
+}
+
+// Right-aligned sortable header (numeric columns).
+.sort-end .mat-sort-header-container {
+  justify-content: flex-end;
+}

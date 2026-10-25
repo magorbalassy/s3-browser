@@ -1,0 +1,66 @@
+:host {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+mat-toolbar {
+  gap: 12px;
+  background: var(--mat-sys-surface-container);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+  font: var(--mat-sys-title-large);
+}
+
+.endpoint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font: var(--mat-sys-label-large);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.endpoint-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.bucket-select {
+  width: 240px;
+  font: var(--mat-sys-body-medium);
+  --mat-form-field-container-height: 40px;
+  --mat-form-field-container-vertical-padding: 8px;
+}
+
+@media (max-width: 720px) {
+  .endpoint,
+  .brand span {
+    display: none;
+  }
+
+  .bucket-select {
+    width: 160px;
+  }
+}

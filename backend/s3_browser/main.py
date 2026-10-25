@@ -44,6 +44,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/api/docs",
         redoc_url=None,
         openapi_url="/api/openapi.json",
+        # operationId = function name, so generated clients get readable method names.
+        generate_unique_id_function=lambda route: route.name,
     )
     app.state.settings = settings
     app.state.sessions = store
@@ -239,7 +241,7 @@ def _mount_spa(app: FastAPI, root: Path) -> None:
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
-_HASHED = re.compile(r"-[A-Z0-9]{8}\.(js|css|woff2?|svg|png|jpg|webp)$")
+_HASHED = re.compile(r"-[A-Za-z0-9]{8}\.(js|css|woff2?|svg|png|jpg|webp)$")
 
 
 app = create_app()

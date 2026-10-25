@@ -1,0 +1,178 @@
+<header class="page-header">
+  <a
+    mat-icon-button
+    [routerLink]="parentLink()"
+    matTooltip="Up one level"
+    aria-label="Up one level"
+  >
+    <mat-icon>arrow_upward</mat-icon>
+  </a>
+  <app-breadcrumbs [bucket]="bucket()" [prefix]="prefix()" />
+  <mat-form-field class="filter" subscriptSizing="dynamic">
+    <mat-icon matPrefix>search</mat-icon>
+    <input
+      matInput
+      placeholder="Filter this folder"
+      aria-label="Filter this folder"
+      [value]="filter()"
+      (input)="filter.set($any($event.target).value)"
+    />
+    @if (filter()) {
+      <button mat-icon-button matSuffix (click)="filter.set('')" aria-label="Clear filter">
+        <mat-icon>close</mat-icon>
+      </button>
+    }
+  </mat-form-field>
+  <button mat-icon-button (click)="reload()" matTooltip="Refresh" aria-label="Refresh">
+    <mat-icon>refresh</mat-icon>
+  </button>
+</header>
+
+<div class="panel">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  @if (error(); as err) {
+    <div class="empty error" role="alert">
+      <mat-icon>{{ err.status === 404 ? 'search_off' : 'error' }}</mat-icon>
+      <p>{{ err.message }}</p>
+      <div class="actions">
+        <a mat-stroked-button routerLink="/b">All buckets</a>
+        <button mat-flat-button (click)="reload()">Try again</button>
+      </div>
+    </div>
+  } @else {
+    <div class="summary">
+      @if (loaded()) {
+        <span>
+          {{ folderCount() | number }} {{ folderCount() === 1 ? 'folder' : 'folders' }},
+          {{ fileCount() | number }} {{ fileCount() === 1 ? 'file' : 'files' }}
+          @if (fileCount()) {
+            ({{ loadedBytes() | bytes }})
+          }
+          @if (hasMore()) {
+            <span class="muted">· more available</span>
+          }
+        </span>
+      } @else {
+        <span>Loading…</span>
+      }
+      <span class="spacer"></span>
+      <app-folder-size-cell [bucket]="bucket()" [prefix]="prefix()" [labelled]="true" />
+    </div>
+
+    <div class="table-scroll">
+      <table
+        mat-table
+        [dataSource]="rows()"
+        [trackBy]="trackRow"
+        matSort
+        [matSortActive]="sort().active"
+        [matSortDirection]="sort().direction"
+        (matSortChange)="sort.set($event)"
+      >
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let row" class="name-cell">
+            @if (row.kind === 'folder') {
+              <a class="name" [routerLink]="row.link" [title]="row.key">
+                <mat-icon class="folder-icon">folder</mat-icon>
+                <span>{{ row.name }}</span>
+              </a>
+            } @else {
+              <span class="name" [title]="row.key">
+                <mat-icon class="file-icon">draft</mat-icon>
+                <span>{{ row.name }}</span>
+              </span>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="size">
+          <th
+            mat-header-cell
+            *matHeaderCellDef
+            mat-sort-header
+            arrowPosition="before"
+            class="sort-end"
+          >
+            Size
+          </th>
+          <td mat-cell *matCellDef="let row" class="size-cell">
+            @if (row.kind === 'folder') {
+              <app-folder-size-cell [bucket]="bucket()" [prefix]="row.key" />
+            } @else {
+              <span [title]="(row.size | number) + ' bytes'">{{ row.size | bytes }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="modified">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Last modified</th>
+          <td mat-cell *matCellDef="let row" class="modified-cell">
+            @if (row.kind === 'file') {
+              <span [title]="row.modified.toISOString()">{{ row.modified | date: 'medium' }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>
+            <span class="cdk-visually-hidden">Actions</span>
+          </th>
+          <td mat-cell *matCellDef="let row" class="actions-cell">
+            <button
+              mat-icon-button
+              class="copy"
+              [cdkCopyToClipboard]="row.key"
+              (cdkCopyToClipboardCopied)="copied(row.kind === 'folder' ? 'prefix' : 'key')"
+              [matTooltip]="row.kind === 'folder' ? 'Copy prefix' : 'Copy key'"
+              aria-label="Copy key"
+            >
+              <mat-icon>content_copy</mat-icon>
+            </button>
+            @if (row.kind === 'file') {
+              <a
+                mat-icon-button
+                [href]="row.download"
+                download
+                matTooltip="Download"
+                aria-label="Download"
+              >
+                <mat-icon>download</mat-icon>
+              </a>
+            }
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: columns"
+          [class.folder-row]="row.kind === 'folder'"
+        ></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell no-data" [attr.colspan]="columns.length">
+            @if (loading()) {
+              Loading…
+            } @else if (filter()) {
+              Nothing in this folder matches “{{ filter() }}”.
+            } @else {
+              This folder is empty.
+            }
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    @if (hasMore()) {
+      <div class="load-more">
+        <button mat-stroked-button (click)="loadMore()" [disabled]="loadingMore()">
+          <mat-icon>expand_more</mat-icon>
+          {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        </button>
+      </div>
+    }
+  }
+</div>

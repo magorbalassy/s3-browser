@@ -1,0 +1,46 @@
+<mat-toolbar>
+  <a class="brand" routerLink="/b">
+    <mat-icon>cloud</mat-icon>
+    <span>S3 Browser</span>
+  </a>
+
+  @if (session.connected()) {
+    <span class="endpoint" [matTooltip]="'Region: ' + session.info()?.region">
+      <mat-icon>dns</mat-icon>
+      <span class="endpoint-label">{{ session.endpointLabel() }}</span>
+    </span>
+  }
+
+  <span class="spacer"></span>
+
+  @if (session.connected()) {
+    <mat-form-field class="bucket-select" subscriptSizing="dynamic">
+      <mat-icon matPrefix>deployed_code</mat-icon>
+      <mat-select
+        placeholder="Select a bucket"
+        aria-label="Bucket"
+        [value]="bucket()"
+        (selectionChange)="openBucket($event.value)"
+      >
+        @for (name of session.buckets(); track name) {
+          <mat-option [value]="name">{{ name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  }
+
+  <button
+    mat-icon-button
+    (click)="theme.cycle()"
+    [matTooltip]="themeLabel()"
+    [attr.aria-label]="themeLabel()"
+  >
+    <mat-icon>{{ theme.icon() }}</mat-icon>
+  </button>
+
+  @if (session.connected()) {
+    <button mat-icon-button (click)="logout()" matTooltip="Disconnect" aria-label="Disconnect">
+      <mat-icon>logout</mat-icon>
+    </button>
+  }
+</mat-toolbar>

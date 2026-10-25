@@ -101,3 +101,14 @@ def serve(
     uvicorn.run(
         "s3_browser.main:app", host=host, port=port, reload=reload, workers=1, proxy_headers=True
     )
+
+
+@app.command()
+def openapi() -> None:
+    """Print the API's OpenAPI schema (used to generate the frontend's types)."""
+    import json
+
+    from .config import Settings
+    from .main import create_app
+
+    typer.echo(json.dumps(create_app(Settings()).openapi(), indent=2))

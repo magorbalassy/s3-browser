@@ -1,0 +1,40 @@
+ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--mat-sys-title-medium);
+}
+
+li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+a {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 2px 4px;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-high);
+  }
+}
+
+.home {
+  display: flex;
+}
+
+span[aria-current] {
+  padding: 2px 4px;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.sep {
+  color: var(--mat-sys-on-surface-variant);
+}

@@ -1,0 +1,14 @@
+:host {
+  display: block;
+}
+
+.filter {
+  width: 260px;
+  max-width: 100%;
+}
+
+.chevron {
+  display: flex;
+  align-self: center;
+  color: var(--mat-sys-on-surface-variant);
+}

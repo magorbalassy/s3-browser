@@ -1,0 +1,52 @@
+@let s = state();
+@if (!s) {
+  @if (labelled()) {
+    <button mat-stroked-button (click)="start()">
+      <mat-icon>calculate</mat-icon>
+      Calculate total size
+    </button>
+  } @else {
+    <button
+      mat-icon-button
+      class="small"
+      (click)="start()"
+      matTooltip="Calculate size"
+      aria-label="Calculate size"
+    >
+      <mat-icon>calculate</mat-icon>
+    </button>
+  }
+} @else if (!s.done) {
+  <span class="running" aria-live="polite">
+    <mat-spinner diameter="16" />
+    <span>{{ s.bytes | bytes }}</span>
+    <span class="muted">· {{ s.objects | number }} objects</span>
+    <button mat-icon-button class="small" (click)="cancel()" matTooltip="Stop" aria-label="Stop">
+      <mat-icon>close</mat-icon>
+    </button>
+  </span>
+} @else if (s.error) {
+  <span class="failed">
+    <mat-icon [matTooltip]="s.error" aria-hidden="true">error</mat-icon>
+    <span class="muted">{{ s.error }}</span>
+    <button mat-icon-button class="small" (click)="start()" matTooltip="Retry" aria-label="Retry">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </span>
+} @else {
+  <span class="done" [matTooltip]="(s.objects | number) + ' objects'">
+    <span>{{ s.bytes | bytes }}</span>
+    @if (labelled()) {
+      <span class="muted">in {{ s.objects | number }} objects</span>
+    }
+    <button
+      mat-icon-button
+      class="small recalc"
+      (click)="start()"
+      matTooltip="Recalculate"
+      aria-label="Recalculate size"
+    >
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </span>
+}

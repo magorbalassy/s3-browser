@@ -1,0 +1,49 @@
+<header class="page-header">
+  <div>
+    <h1>Buckets</h1>
+    <p class="subtitle">
+      {{ session.buckets().length }} {{ session.buckets().length === 1 ? 'bucket' : 'buckets' }} on
+      {{ session.endpointLabel() }}
+    </p>
+  </div>
+  <span class="spacer"></span>
+  <mat-form-field class="filter" subscriptSizing="dynamic">
+    <mat-icon matPrefix>search</mat-icon>
+    <input
+      matInput
+      placeholder="Filter buckets"
+      aria-label="Filter buckets"
+      [value]="filter()"
+      (input)="filter.set($any($event.target).value)"
+    />
+  </mat-form-field>
+  <button mat-icon-button (click)="refresh()" matTooltip="Refresh" aria-label="Refresh">
+    <mat-icon>refresh</mat-icon>
+  </button>
+</header>
+
+<div class="panel">
+  @if (refreshing()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  @if (visible().length) {
+    <mat-nav-list>
+      @for (name of visible(); track name) {
+        <a mat-list-item [routerLink]="['/b', name]">
+          <mat-icon matListItemIcon>deployed_code</mat-icon>
+          <span matListItemTitle>{{ name }}</span>
+          <span matListItemMeta class="chevron"><mat-icon>chevron_right</mat-icon></span>
+        </a>
+      }
+    </mat-nav-list>
+  } @else {
+    <div class="empty">
+      <mat-icon>inventory_2</mat-icon>
+      @if (session.buckets().length) {
+        <p>No bucket matches “{{ filter() }}”.</p>
+      } @else {
+        <p>These credentials cannot see any buckets.</p>
+      }
+    </div>
+  }
+</div>
