@@ -70,13 +70,24 @@ describe('Connect', () => {
     expect(el().querySelector('[role=alert]')?.textContent).toContain('Could not connect');
   });
 
-  it('rejects endpoints without a scheme', async () => {
-    type('url', 'minio:9000');
+  it('assumes https:// when the endpoint has no scheme', async () => {
+    connect.mockResolvedValue({ buckets: [] });
+    type('url', 's3.corp.lan:9000');
+    type('username', 'AKIA');
+    type('current-password', 'secret');
+    await submit();
+    expect(connect).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint: 'https://s3.corp.lan:9000' }),
+    );
+  });
+
+  it('rejects other URL schemes', async () => {
+    type('url', 'ftp://files.lan');
     type('username', 'AKIA');
     type('current-password', 'secret');
     await submit();
     expect(connect).not.toHaveBeenCalled();
-    expect(el().textContent).toContain('Must start with http://');
+    expect(el().textContent).toContain('Only http:// and https://');
   });
 
   describe('TLS options', () => {
@@ -89,10 +100,14 @@ describe('Connect', () => {
       await fixture.whenStable();
     }
 
-    it('are only offered for https endpoints', async () => {
-      expect(el().querySelector('fieldset.tls')).toBeNull();
-      await fillHttps();
+    it('are always visible, and disabled only for http:// endpoints', async () => {
+      const ca = () => el().querySelector('fieldset.tls textarea') as HTMLTextAreaElement;
       expect(el().querySelector('fieldset.tls')).toBeTruthy();
+      expect(ca().disabled).toBe(false);
+      type('url', 'http://minio.lan:9000');
+      await fixture.whenStable();
+      expect(ca().disabled).toBe(true);
+      expect(el().querySelector('.tls-off')?.textContent).toContain('plain http://');
     });
 
     it('sends a custom CA certificate', async () => {

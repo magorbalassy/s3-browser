@@ -33,7 +33,15 @@ interface ConnectModel {
 }
 
 const PEM_HEADER = '-----BEGIN CERTIFICATE-----';
-const isHttps = (endpoint: string) => endpoint.trim().toLowerCase().startsWith('https://');
+/** "s3.example.com:9000" means "https://s3.example.com:9000"; empty stays empty (AWS S3). */
+export function normalizeEndpoint(endpoint: string): string {
+  const value = endpoint.trim();
+  return !value || /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+/** Everything except an explicit http:// endpoint uses TLS (AWS S3 included). */
+const usesTls = (endpoint: string) =>
+  !normalizeEndpoint(endpoint).toLowerCase().startsWith('http://');
 
 /** Saved between visits: everything except the secret key (a CA certificate is public). */
 type Remembered = Omit<ConnectModel, 'secretKey' | 'remember'>;
@@ -72,17 +80,23 @@ export class Connect {
   });
 
   protected readonly connectForm = form(this.model, (s) => {
-    pattern(s.endpoint, /^(https?:\/\/\S+)?$/, {
-      message: 'Must start with http:// or https:// (or leave empty for AWS S3)',
-    });
+    pattern(s.endpoint, /^\S*$/, { message: 'The endpoint cannot contain spaces' });
+    validate(s.endpoint, ({ value }) =>
+      /^https?:\/\/.+/i.test(normalizeEndpoint(value()))
+        ? undefined
+        : value().trim()
+          ? { kind: 'scheme', message: 'Only http:// and https:// endpoints are supported' }
+          : undefined,
+    );
     required(s.accessKey, { message: 'Access key is required' });
     required(s.secretKey, { message: 'Secret key is required' });
     required(s.region, { message: 'Region is required' });
-    // A custom CA only matters for HTTPS endpoints whose certificate is verified.
-    disabled(s.caCert, ({ valueOf }) => valueOf(s.skipTlsVerify));
+    // TLS options don't apply to http://, and a custom CA is moot when nothing is verified.
+    disabled(s.skipTlsVerify, ({ valueOf }) => !usesTls(valueOf(s.endpoint)));
+    disabled(s.caCert, ({ valueOf }) => valueOf(s.skipTlsVerify) || !usesTls(valueOf(s.endpoint)));
     applyWhen(
       s.caCert,
-      ({ valueOf }) => isHttps(valueOf(s.endpoint)) && !valueOf(s.skipTlsVerify),
+      ({ valueOf }) => usesTls(valueOf(s.endpoint)) && !valueOf(s.skipTlsVerify),
       (ca) =>
         validate(ca, ({ value }) =>
           value().trim() && !value().includes(PEM_HEADER)
@@ -92,8 +106,8 @@ export class Connect {
     );
   });
 
-  /** TLS options only apply to https:// endpoints (AWS S3 always uses public CAs). */
-  protected readonly https = computed(() => isHttps(this.model().endpoint));
+  /** False for plain http:// endpoints, where the TLS options don't apply. */
+  protected readonly tls = computed(() => usesTls(this.model().endpoint));
 
   protected readonly connecting = signal(false);
   protected readonly error = signal<ApiError | undefined>(undefined);
@@ -105,9 +119,9 @@ export class Connect {
       this.connecting.set(true);
       this.error.set(undefined);
       try {
-        const tls = this.https();
+        const tls = this.tls();
         const info = await this.session.connect({
-          endpoint: value.endpoint.trim(),
+          endpoint: normalizeEndpoint(value.endpoint),
           access_key: value.accessKey.trim(),
           secret_key: value.secretKey,
           region: value.region.trim(),

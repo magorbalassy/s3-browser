@@ -23,11 +23,11 @@
         <input
           matInput
           [formField]="connectForm.endpoint"
-          placeholder="http://minio.local:9000"
+          placeholder="https://s3.example.com:9000"
           autocomplete="url"
           spellcheck="false"
         />
-        <mat-hint>Leave empty to connect to AWS S3</mat-hint>
+        <mat-hint>Leave empty for AWS S3. Without a scheme, https:// is used.</mat-hint>
         @for (e of connectForm.endpoint().errors(); track e.kind) {
           <mat-error>{{ e.message }}</mat-error>
         }
@@ -81,55 +81,56 @@
         }
       </mat-form-field>
 
-      @if (https()) {
-        <fieldset class="tls">
-          <legend>TLS</legend>
-          <mat-checkbox [formField]="connectForm.skipTlsVerify">
-            Skip certificate verification
-          </mat-checkbox>
-          @if (model().skipTlsVerify) {
-            <div class="warning" role="note">
-              <mat-icon>warning</mat-icon>
-              <span>
-                The connection is still encrypted, but the server's identity is not checked. Only
-                use this for endpoints you trust.
-              </span>
-            </div>
-          } @else {
-            <mat-form-field>
-              <mat-label>Custom CA certificate (optional)</mat-label>
-              <textarea
-                matInput
-                class="pem"
-                rows="4"
-                [formField]="connectForm.caCert"
-                placeholder="-----BEGIN CERTIFICATE-----"
-                spellcheck="false"
-              ></textarea>
-              <button
-                mat-icon-button
-                matSuffix
-                type="button"
-                (click)="caFile.click()"
-                aria-label="Load CA certificate from a file"
-              >
-                <mat-icon>upload_file</mat-icon>
-              </button>
-              <mat-hint>For self-signed or internal CAs. Paste the PEM or load a file.</mat-hint>
-              @for (e of connectForm.caCert().errors(); track e.kind) {
-                <mat-error>{{ e.message }}</mat-error>
-              }
-            </mat-form-field>
-            <input
-              #caFile
-              type="file"
-              hidden
-              accept=".pem,.crt,.cer,.ca-bundle,application/x-pem-file"
-              (change)="loadCaFile(caFile)"
-            />
-          }
-        </fieldset>
-      }
+      <fieldset class="tls">
+        <legend>TLS / certificates</legend>
+        @if (!tls()) {
+          <p class="tls-off">Not used for plain http:// endpoints.</p>
+        }
+        <mat-checkbox [formField]="connectForm.skipTlsVerify">
+          Skip certificate verification
+        </mat-checkbox>
+        @if (model().skipTlsVerify) {
+          <div class="warning" role="note">
+            <mat-icon>warning</mat-icon>
+            <span>
+              The connection is still encrypted, but the server's identity is not checked. Only use
+              this for endpoints you trust.
+            </span>
+          </div>
+        } @else {
+          <mat-form-field>
+            <mat-label>Custom CA certificate (optional)</mat-label>
+            <textarea
+              matInput
+              class="pem"
+              rows="4"
+              [formField]="connectForm.caCert"
+              placeholder="-----BEGIN CERTIFICATE-----"
+              spellcheck="false"
+            ></textarea>
+            <button
+              mat-icon-button
+              matSuffix
+              type="button"
+              (click)="caFile.click()"
+              aria-label="Load CA certificate from a file"
+            >
+              <mat-icon>upload_file</mat-icon>
+            </button>
+            <mat-hint>For self-signed or internal CAs. Paste the PEM or load a file.</mat-hint>
+            @for (e of connectForm.caCert().errors(); track e.kind) {
+              <mat-error>{{ e.message }}</mat-error>
+            }
+          </mat-form-field>
+          <input
+            #caFile
+            type="file"
+            hidden
+            accept=".pem,.crt,.cer,.ca-bundle,application/x-pem-file"
+            (change)="loadCaFile(caFile)"
+          />
+        }
+      </fieldset>
 
       <mat-checkbox [formField]="connectForm.remember">
         Remember endpoint, access key, region and TLS settings on this device

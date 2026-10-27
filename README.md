@@ -23,7 +23,7 @@ secret key.
 
 ### HTTPS endpoints with private certificates
 
-For an `https://` endpoint the connect page shows TLS options:
+The connect page has a **TLS / certificates** section (used for every endpoint except plain `http://`; an endpoint without a scheme is treated as `https://`):
 
 - **Custom CA certificate**: paste the PEM or load the file (`.pem` / `.crt`) of the CA that signed
   the endpoint's certificate (self-signed or internal CA). It is trusted in addition to the public
