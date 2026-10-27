@@ -44,6 +44,23 @@ export class TopBar {
     return segments.length >= 2 && segments[0].path === 'b' ? segments[1].path : '';
   });
 
+  /** How the connection's TLS is set up, shown next to the endpoint. */
+  protected readonly tls = computed(() => {
+    const info = this.session.info();
+    const region = `Region: ${info?.region ?? ''}`;
+    if (info && !info.verify_tls) {
+      return { icon: 'gpp_bad', insecure: true, tooltip: `TLS verification is off · ${region}` };
+    }
+    if (info?.custom_ca) {
+      return {
+        icon: 'verified_user',
+        insecure: false,
+        tooltip: `Trusted via custom CA · ${region}`,
+      };
+    }
+    return { icon: 'dns', insecure: false, tooltip: region };
+  });
+
   protected readonly themeLabel = computed(() => `Theme: ${this.theme.mode()}`);
 
   protected openBucket(bucket: string): void {

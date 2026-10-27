@@ -3,6 +3,12 @@
 
 export interface SessionInfo {
   buckets: Array<string>;
+
+  /**
+   * A custom CA certificate is in use.
+   */
+  custom_ca: boolean;
   endpoint: string;
   region: string;
+  verify_tls: boolean;
 }

@@ -1,9 +1,14 @@
 """S3 access, independent of the web layer (shared by the API and the CLI)."""
 
+import os
+import tempfile
+import warnings
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import boto3
+import urllib3
 from botocore.config import Config
 from botocore.exceptions import (
     BotoCoreError,
@@ -11,11 +16,17 @@ from botocore.exceptions import (
     ConnectTimeoutError,
     EndpointConnectionError,
     ReadTimeoutError,
+    SSLError,
 )
+from botocore.httpsession import get_cert_path
 
 from .models import S3File, S3Folder
 
 MAX_PAGE_SIZE = 1000
+
+# Unverified TLS is an explicit per-connection choice (shown in the UI); don't log a
+# warning for every request it makes.
+warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
 
 
 class S3Error(Exception):
@@ -44,6 +55,13 @@ def translate(exc: Exception, endpoint: str = "") -> S3Error:
     target = endpoint or "AWS S3"
     if isinstance(exc, S3Error):
         return exc
+    if isinstance(exc, SSLError):
+        return S3Error(
+            "tls_error",
+            f"TLS certificate verification failed for {target}. Add its CA certificate, "
+            "or skip verification if you trust this endpoint.",
+            502,
+        )
     if isinstance(exc, EndpointConnectionError | ConnectTimeoutError):
         return S3Error("endpoint_unreachable", f"Could not connect to {target}.", 502)
     if isinstance(exc, ReadTimeoutError):
@@ -73,6 +91,9 @@ class S3Browser:
     access_key: str
     secret_key: str
     region: str = "us-east-1"
+    verify_tls: bool = True
+    ca_cert: str = ""
+    _ca_bundle: Path | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         # Custom endpoints (MinIO, Ceph, ...) usually need path-style addressing;
@@ -91,9 +112,32 @@ class S3Browser:
                 aws_secret_access_key=self.secret_key,
                 region_name=self.region,
                 config=config,
+                verify=self._verify(),
             )
         except Exception as exc:
+            self.close()
             raise translate(exc, self.endpoint) from exc
+
+    def _verify(self) -> bool | str | None:
+        """botocore's `verify`: False, a CA bundle path, or None for the default CAs."""
+        if not self.verify_tls:
+            return False
+        if not self.ca_cert:
+            return None
+        # botocore only takes a file path, and a custom bundle replaces the default one:
+        # write the public CAs plus the custom certificate(s) to a private temp file.
+        fd, path = tempfile.mkstemp(prefix="s3b-ca-", suffix=".pem")
+        with os.fdopen(fd, "w") as bundle:
+            bundle.write(Path(get_cert_path(True)).read_text())
+            bundle.write("\n" + self.ca_cert)
+        self._ca_bundle = Path(path)
+        return path
+
+    def close(self) -> None:
+        """Release resources (the temporary CA bundle, if any)."""
+        if self._ca_bundle:
+            self._ca_bundle.unlink(missing_ok=True)
+            self._ca_bundle = None
 
     def list_buckets(self) -> list[str]:
         try:

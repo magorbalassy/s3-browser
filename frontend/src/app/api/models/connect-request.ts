@@ -5,9 +5,19 @@ export interface ConnectRequest {
   access_key: string;
 
   /**
+   * Extra CA certificate(s) in PEM format, trusted in addition to public CAs.
+   */
+  ca_cert?: string;
+
+  /**
    * S3 endpoint URL, e.g. http://minio:9000. Empty means AWS S3.
    */
   endpoint?: string;
   region?: string;
   secret_key: string;
+
+  /**
+   * Verify the endpoint's TLS certificate. Disable only for trusted endpoints.
+   */
+  verify_tls?: boolean;
 }

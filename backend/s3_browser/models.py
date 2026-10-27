@@ -1,5 +1,6 @@
 """API request and response models. The frontend's TypeScript types are generated from these."""
 
+import ssl
 from datetime import datetime
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
@@ -14,6 +15,29 @@ class ConnectRequest(BaseModel):
     access_key: str = Field(min_length=1, max_length=256)
     secret_key: SecretStr = Field(min_length=1, max_length=256)
     region: str = Field(default="us-east-1", min_length=1, max_length=64)
+    verify_tls: bool = Field(
+        default=True,
+        description="Verify the endpoint's TLS certificate. Disable only for trusted endpoints.",
+    )
+    ca_cert: str = Field(
+        default="",
+        description="Extra CA certificate(s) in PEM format, trusted in addition to public CAs.",
+        max_length=65536,
+    )
+
+    @field_validator("ca_cert")
+    @classmethod
+    def check_ca_cert(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
+        if "-----BEGIN CERTIFICATE-----" not in value:
+            raise ValueError("must be a PEM certificate (-----BEGIN CERTIFICATE-----)")
+        try:
+            ssl.create_default_context(cadata=value)
+        except (ssl.SSLError, ValueError) as exc:
+            raise ValueError("is not a valid PEM certificate") from exc
+        return value + "\n"
 
     @field_validator("endpoint")
     @classmethod
@@ -27,6 +51,8 @@ class ConnectRequest(BaseModel):
 class SessionInfo(BaseModel):
     endpoint: str
     region: str
+    verify_tls: bool
+    custom_ca: bool = Field(description="A custom CA certificate is in use.")
     buckets: list[str]
 
 

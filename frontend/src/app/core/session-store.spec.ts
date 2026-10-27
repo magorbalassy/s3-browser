@@ -7,6 +7,8 @@ import { SessionStore } from './session-store';
 const INFO: SessionInfo = {
   endpoint: 'http://minio:9000',
   region: 'us-east-1',
+  verify_tls: true,
+  custom_ca: false,
   buckets: ['a', 'b'],
 };
 

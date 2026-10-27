@@ -8,10 +8,19 @@ import { TopBar } from './top-bar';
 describe('TopBar', () => {
   let fixture: ComponentFixture<TopBar>;
   const connected = signal(false);
+  const verifyTls = signal(true);
   const session = {
     connected,
     info: computed(() =>
-      connected() ? { endpoint: '', region: 'us-east-1', buckets: [] } : undefined,
+      connected()
+        ? {
+            endpoint: '',
+            region: 'us-east-1',
+            verify_tls: verifyTls(),
+            custom_ca: false,
+            buckets: [],
+          }
+        : undefined,
     ),
     endpointLabel: () => 'AWS S3',
     buckets: () => ['photos'],
@@ -22,6 +31,7 @@ describe('TopBar', () => {
 
   beforeEach(async () => {
     connected.set(false);
+    verifyTls.set(true);
     TestBed.configureTestingModule({
       imports: [TopBar],
       providers: [
@@ -41,6 +51,16 @@ describe('TopBar', () => {
     await fixture.whenStable();
     expect(el().textContent).toContain('AWS S3');
     expect(el().querySelector('mat-select')).toBeTruthy();
+  });
+
+  it('flags connections without TLS verification', async () => {
+    connected.set(true);
+    await fixture.whenStable();
+    expect(el().querySelector('.endpoint.insecure')).toBeNull();
+    verifyTls.set(false);
+    await fixture.whenStable();
+    const badge = el().querySelector('.endpoint.insecure');
+    expect(badge?.getAttribute('aria-label')).toContain('TLS verification is off');
   });
 
   it('disconnects and clears cached sizes', async () => {

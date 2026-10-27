@@ -115,9 +115,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.allowed_endpoints and body.endpoint not in settings.allowed_endpoints:
             raise S3Error("endpoint_not_allowed", "This endpoint is not allowed.", 403)
         browser = S3Browser(
-            body.endpoint, body.access_key, body.secret_key.get_secret_value(), body.region
+            body.endpoint,
+            body.access_key,
+            body.secret_key.get_secret_value(),
+            body.region,
+            verify_tls=body.verify_tls,
+            ca_cert=body.ca_cert,
         )
-        buckets = browser.list_buckets()  # also verifies the credentials
+        try:
+            buckets = browser.list_buckets()  # also verifies the credentials
+        except Exception:
+            browser.close()
+            raise
         store.remove(session_id)
         session = store.create(browser)
         response.set_cookie(
@@ -129,15 +138,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             secure=settings.cookie_secure,
             path="/api",
         )
-        log.info("Connected to %s (%d buckets)", body.endpoint or "AWS S3", len(buckets))
-        return SessionInfo(endpoint=body.endpoint, region=body.region, buckets=buckets)
+        log.info(
+            "Connected to %s (%d buckets%s)",
+            body.endpoint or "AWS S3",
+            len(buckets),
+            "" if body.verify_tls else ", TLS verification off",
+        )
+        return _session_info(browser, buckets)
 
     @api.get("/session", response_model=SessionInfo, tags=["session"])
     def get_session(session: SessionDep) -> SessionInfo:
-        browser = session.browser
-        return SessionInfo(
-            endpoint=browser.endpoint, region=browser.region, buckets=browser.list_buckets()
-        )
+        return _session_info(session.browser, session.browser.list_buckets())
 
     @api.delete("/session", status_code=204, tags=["session"])
     def disconnect(
@@ -220,6 +231,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         _mount_spa(app, settings.static_dir.resolve())
 
     return app
+
+
+def _session_info(browser: S3Browser, buckets: list[str]) -> SessionInfo:
+    return SessionInfo(
+        endpoint=browser.endpoint,
+        region=browser.region,
+        verify_tls=browser.verify_tls,
+        custom_ca=bool(browser.ca_cert),
+        buckets=buckets,
+    )
 
 
 def _sse(event: SizeProgress) -> str:

@@ -5,8 +5,13 @@
   </a>
 
   @if (session.connected()) {
-    <span class="endpoint" [matTooltip]="'Region: ' + session.info()?.region">
-      <mat-icon>dns</mat-icon>
+    <span
+      class="endpoint"
+      [class.insecure]="tls().insecure"
+      [matTooltip]="tls().tooltip"
+      [attr.aria-label]="session.endpointLabel() + '. ' + tls().tooltip"
+    >
+      <mat-icon>{{ tls().icon }}</mat-icon>
       <span class="endpoint-label">{{ session.endpointLabel() }}</span>
     </span>
   }

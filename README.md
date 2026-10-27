@@ -21,6 +21,19 @@ docker run -d --name s3-browser -p 8080:8080 magorbalassy/s3-browser:latest
 Open http://localhost:8080 and enter the endpoint URL (leave it empty for AWS S3), access key and
 secret key.
 
+### HTTPS endpoints with private certificates
+
+For an `https://` endpoint the connect page shows TLS options:
+
+- **Custom CA certificate**: paste the PEM or load the file (`.pem` / `.crt`) of the CA that signed
+  the endpoint's certificate (self-signed or internal CA). It is trusted in addition to the public
+  CAs, for that connection only.
+- **Skip certificate verification**: still encrypted, but the server's identity is not checked.
+  The endpoint badge in the top bar turns red while such a connection is active.
+
+Downloads go from the browser straight to the S3 endpoint, so for downloads the browser itself must
+trust that certificate.
+
 ### Configuration
 
 | Variable            | Default | Description                                                                                                        |
@@ -43,7 +56,7 @@ Notes:
 ## Command line
 
 The backend doubles as a CLI (credentials can also come from `ENDPOINT`, `ACCESS_KEY`,
-`SECRET_KEY`, `BUCKET_NAME`, `FOLDER_PATH`):
+`SECRET_KEY`, `BUCKET_NAME`, `FOLDER_PATH`; TLS options are `--ca-cert FILE` and `--insecure`):
 
 ```bash
 docker run --rm magorbalassy/s3-browser s3-browser size \

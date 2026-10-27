@@ -19,6 +19,8 @@ def test_connect_sets_http_only_cookie_and_lists_buckets(client):
     assert response.json() == {
         "endpoint": "",
         "region": "us-east-1",
+        "verify_tls": True,
+        "custom_ca": False,
         "buckets": ["empty", "photos"],
     }
     cookie = response.headers["set-cookie"]

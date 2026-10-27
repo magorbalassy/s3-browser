@@ -48,7 +48,9 @@ class SessionStore:
     def remove(self, session_id: str | None) -> None:
         if session_id:
             with self._lock:
-                self._sessions.pop(session_id, None)
+                session = self._sessions.pop(session_id, None)
+                if session:
+                    session.browser.close()
 
     def __len__(self) -> int:
         return len(self._sessions)
@@ -56,4 +58,4 @@ class SessionStore:
     def _purge(self) -> None:
         cutoff = time.monotonic() - self._ttl
         for sid in [sid for sid, s in self._sessions.items() if s.last_seen < cutoff]:
-            del self._sessions[sid]
+            self._sessions.pop(sid).browser.close()

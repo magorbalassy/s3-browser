@@ -47,10 +47,18 @@ describe('Connect', () => {
       access_key: 'AKIA',
       secret_key: 'secret',
       region: 'us-east-1',
+      verify_tls: true,
+      ca_cert: '',
     });
     expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith('/b/photos');
     const saved = localStorage.getItem('s3b.connection')!;
-    expect(JSON.parse(saved)).toEqual({ endpoint: '', accessKey: 'AKIA', region: 'us-east-1' });
+    expect(JSON.parse(saved)).toEqual({
+      endpoint: '',
+      accessKey: 'AKIA',
+      region: 'us-east-1',
+      skipTlsVerify: false,
+      caCert: '',
+    });
     expect(saved).not.toContain('secret');
   });
 
@@ -69,5 +77,69 @@ describe('Connect', () => {
     await submit();
     expect(connect).not.toHaveBeenCalled();
     expect(el().textContent).toContain('Must start with http://');
+  });
+
+  describe('TLS options', () => {
+    const PEM = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+
+    async function fillHttps(): Promise<void> {
+      type('url', 'https://minio.lan:9000');
+      type('username', 'AKIA');
+      type('current-password', 'secret');
+      await fixture.whenStable();
+    }
+
+    it('are only offered for https endpoints', async () => {
+      expect(el().querySelector('fieldset.tls')).toBeNull();
+      await fillHttps();
+      expect(el().querySelector('fieldset.tls')).toBeTruthy();
+    });
+
+    it('sends a custom CA certificate', async () => {
+      connect.mockResolvedValue({ buckets: [] });
+      await fillHttps();
+      const ca = el().querySelector('textarea') as HTMLTextAreaElement;
+      ca.value = PEM;
+      ca.dispatchEvent(new Event('input'));
+      await submit();
+      expect(connect).toHaveBeenCalledWith(
+        expect.objectContaining({ verify_tls: true, ca_cert: PEM }),
+      );
+    });
+
+    it('rejects text that is not a PEM certificate', async () => {
+      await fillHttps();
+      const ca = el().querySelector('textarea') as HTMLTextAreaElement;
+      ca.value = 'hello';
+      ca.dispatchEvent(new Event('input'));
+      await submit();
+      expect(connect).not.toHaveBeenCalled();
+      expect(el().textContent).toContain('Paste a PEM certificate');
+    });
+
+    it('can skip verification, with a warning', async () => {
+      connect.mockResolvedValue({ buckets: [] });
+      await fillHttps();
+      const skip = el().querySelector('fieldset.tls input[type=checkbox]') as HTMLInputElement;
+      skip.click();
+      await fixture.whenStable();
+      expect(el().querySelector('.warning')?.textContent).toContain('identity is not checked');
+      expect(el().querySelector('textarea')).toBeNull();
+      await submit();
+      expect(connect).toHaveBeenCalledWith(
+        expect.objectContaining({ verify_tls: false, ca_cert: '' }),
+      );
+    });
+
+    it('loads the CA from a file', async () => {
+      await fillHttps();
+      const input = el().querySelector('input[type=file]') as HTMLInputElement;
+      const file = new File([PEM + '\n'], 'ca.pem', { type: 'application/x-pem-file' });
+      Object.defineProperty(input, 'files', { value: [file] });
+      input.dispatchEvent(new Event('change'));
+      await new Promise((resolve) => setTimeout(resolve));
+      await fixture.whenStable();
+      expect((el().querySelector('textarea') as HTMLTextAreaElement).value).toBe(PEM);
+    });
   });
 });

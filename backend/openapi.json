@@ -988,6 +988,19 @@
             "minLength": 1,
             "title": "Region",
             "default": "us-east-1"
+          },
+          "verify_tls": {
+            "type": "boolean",
+            "title": "Verify Tls",
+            "description": "Verify the endpoint's TLS certificate. Disable only for trusted endpoints.",
+            "default": true
+          },
+          "ca_cert": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Ca Cert",
+            "description": "Extra CA certificate(s) in PEM format, trusted in addition to public CAs.",
+            "default": ""
           }
         },
         "type": "object",
@@ -1145,6 +1158,15 @@
             "type": "string",
             "title": "Region"
           },
+          "verify_tls": {
+            "type": "boolean",
+            "title": "Verify Tls"
+          },
+          "custom_ca": {
+            "type": "boolean",
+            "title": "Custom Ca",
+            "description": "A custom CA certificate is in use."
+          },
           "buckets": {
             "items": {
               "type": "string"
@@ -1157,6 +1179,8 @@
         "required": [
           "endpoint",
           "region",
+          "verify_tls",
+          "custom_ca",
           "buckets"
         ],
         "title": "SessionInfo"

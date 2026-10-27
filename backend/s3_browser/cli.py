@@ -1,5 +1,6 @@
 """Command line interface: query an endpoint directly, or run the web server."""
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -14,6 +15,25 @@ SecretKey = Annotated[str, typer.Option("--secret-key", "-s", envvar="SECRET_KEY
 Region = Annotated[str, typer.Option("--region", "-r", envvar="REGION")]
 Bucket = Annotated[str, typer.Option("--bucket", "-b", envvar="BUCKET_NAME")]
 Prefix = Annotated[str, typer.Option("--prefix", "-p", envvar="FOLDER_PATH", help="'' = bucket")]
+Insecure = Annotated[
+    bool, typer.Option("--insecure", envvar="INSECURE", help="Skip TLS certificate verification")
+]
+CaCert = Annotated[
+    Path | None,
+    typer.Option("--ca-cert", envvar="CA_CERT", help="Extra CA certificate (PEM) to trust"),
+]
+
+
+def _browser(
+    endpoint: str,
+    access_key: str,
+    secret_key: str,
+    region: str,
+    insecure: bool = False,
+    ca_cert: Path | None = None,
+) -> S3Browser:
+    ca = ca_cert.read_text() if ca_cert else ""
+    return S3Browser(endpoint, access_key, secret_key, region, verify_tls=not insecure, ca_cert=ca)
 
 
 def human(size: float) -> str:
@@ -35,10 +55,14 @@ def buckets(
     secret_key: SecretKey,
     endpoint: Endpoint = "",
     region: Region = "us-east-1",
+    insecure: Insecure = False,
+    ca_cert: CaCert = None,
 ) -> None:
     """List buckets."""
     try:
-        for name in S3Browser(endpoint, access_key, secret_key, region).list_buckets():
+        for name in _browser(
+            endpoint, access_key, secret_key, region, insecure, ca_cert
+        ).list_buckets():
             typer.echo(name)
     except S3Error as err:
         _fail(err)
@@ -51,10 +75,12 @@ def ls(
     bucket: Bucket,
     endpoint: Endpoint = "",
     region: Region = "us-east-1",
+    insecure: Insecure = False,
+    ca_cert: CaCert = None,
     prefix: Prefix = "",
 ) -> None:
     """List the folders and files directly under a prefix."""
-    browser = S3Browser(endpoint, access_key, secret_key, region)
+    browser = _browser(endpoint, access_key, secret_key, region, insecure, ca_cert)
     token: str | None = None
     try:
         while True:
@@ -76,12 +102,14 @@ def size(
     bucket: Bucket,
     endpoint: Endpoint = "",
     region: Region = "us-east-1",
+    insecure: Insecure = False,
+    ca_cert: CaCert = None,
     prefix: Prefix = "",
     raw: Annotated[bool, typer.Option(help="Print bytes only.")] = False,
 ) -> None:
     """Total size of everything under a prefix (the whole bucket by default)."""
     try:
-        total, count = S3Browser(endpoint, access_key, secret_key, region).size(
+        total, count = _browser(endpoint, access_key, secret_key, region, insecure, ca_cert).size(
             bucket, prefix.lstrip("/")
         )
     except S3Error as err:
