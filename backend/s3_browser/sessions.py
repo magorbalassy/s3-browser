@@ -19,7 +19,8 @@ COOKIE_NAME = "s3b_session"
 class Session:
     id: str
     browser: S3Browser
-    last_seen: float = field(default_factory=time.monotonic)
+    # A lambda, so the clock is looked up at creation time (and can be faked in tests).
+    last_seen: float = field(default_factory=lambda: time.monotonic())
 
 
 class SessionStore:

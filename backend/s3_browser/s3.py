@@ -89,10 +89,10 @@ def _name(path: str) -> str:
 class S3Browser:
     endpoint: str
     access_key: str
-    secret_key: str
+    secret_key: str = field(repr=False)  # never in logs or tracebacks
     region: str = "us-east-1"
     verify_tls: bool = True
-    ca_cert: str = ""
+    ca_cert: str = field(default="", repr=False)
     _ca_bundle: Path | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:

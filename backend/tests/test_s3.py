@@ -34,7 +34,8 @@ def test_size():
 def test_session_store_expiry(monkeypatch):
     import s3_browser.sessions as sessions
 
-    now = [1000.0]
+    # Far beyond any real uptime, so the test fails if code bypasses the fake clock.
+    now = [10.0**9]
     monkeypatch.setattr(sessions.time, "monotonic", lambda: now[0])
     store = SessionStore(ttl=60)
     session = store.create(S3Browser("", "test", "test"))
@@ -44,3 +45,9 @@ def test_session_store_expiry(monkeypatch):
     now[0] += 61
     assert store.get(session.id) is None
     assert len(store) == 0
+
+
+def test_repr_hides_secrets():
+    browser = S3Browser("", "AKIA", "super-secret", ca_cert="")
+    assert "super-secret" not in repr(browser)
+    assert "AKIA" in repr(browser)
