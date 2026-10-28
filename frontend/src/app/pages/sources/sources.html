@@ -1,0 +1,112 @@
+<header class="page-header">
+  <div>
+    <h1>Sources</h1>
+    <p class="subtitle">S3 endpoints saved on this server, available to everyone using it.</p>
+  </div>
+  <span class="spacer"></span>
+  <a mat-flat-button routerLink="/sources/new">
+    <mat-icon>add</mat-icon>
+    Add source
+  </a>
+</header>
+
+<div class="panel">
+  @if (!store.loaded() && !loadError()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  @if (loadError(); as err) {
+    <div class="empty error" role="alert">
+      <mat-icon>error</mat-icon>
+      <p>{{ err.message }}</p>
+    </div>
+  } @else if (store.loaded() && !rows().length) {
+    <div class="empty">
+      <mat-icon>storage</mat-icon>
+      <p>No sources yet. Add your first S3 endpoint to start browsing.</p>
+      <a mat-flat-button routerLink="/sources/new">
+        <mat-icon>add</mat-icon>
+        Add source
+      </a>
+    </div>
+  } @else {
+    <ul class="sources">
+      @for (row of rows(); track row.source.id) {
+        <li>
+          <a class="main" [routerLink]="['/s', row.source.id]">
+            <mat-icon class="icon">storage</mat-icon>
+            <span class="text">
+              <span class="name">{{ row.source.name }}</span>
+              <span class="meta">
+                <mat-icon
+                  inline
+                  [class.insecure]="row.tls.insecure"
+                  [matTooltip]="row.tls.label"
+                  [attr.aria-label]="row.tls.label"
+                  >{{ row.tls.icon }}</mat-icon
+                >
+                {{ row.endpoint }} · {{ row.source.region }}
+              </span>
+            </span>
+          </a>
+
+          <span class="status" aria-live="polite">
+            @if (!row.buckets || row.buckets.loading) {
+              <mat-spinner diameter="16" />
+              <span class="muted">Checking…</span>
+            } @else if (row.buckets?.error; as err) {
+              <span class="bad" [matTooltip]="err.message">
+                <mat-icon inline>cloud_off</mat-icon>
+                {{ err.message }}
+              </span>
+            } @else {
+              <span class="good">
+                <mat-icon inline>check_circle</mat-icon>
+                {{ row.buckets?.buckets?.length ?? 0 }}
+                {{ row.buckets?.buckets?.length === 1 ? 'bucket' : 'buckets' }}
+              </span>
+            }
+          </span>
+
+          <span class="actions">
+            <button
+              mat-icon-button
+              (click)="recheck(row.source)"
+              matTooltip="Check connection"
+              aria-label="Check connection"
+            >
+              <mat-icon>refresh</mat-icon>
+            </button>
+            <a
+              mat-icon-button
+              [routerLink]="['/sources', row.source.id]"
+              matTooltip="Edit"
+              [attr.aria-label]="'Edit ' + row.source.name"
+            >
+              <mat-icon>edit</mat-icon>
+            </a>
+            @if (confirmDelete() === row.source.id) {
+              <button
+                mat-flat-button
+                class="danger"
+                (click)="remove(row.source)"
+                [disabled]="deleting() === row.source.id"
+              >
+                Delete?
+              </button>
+              <button mat-button (click)="confirmDelete.set('')">Keep</button>
+            } @else {
+              <button
+                mat-icon-button
+                (click)="remove(row.source)"
+                matTooltip="Delete"
+                [attr.aria-label]="'Delete ' + row.source.name"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </span>
+        </li>
+      }
+    </ul>
+  }
+</div>

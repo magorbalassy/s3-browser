@@ -16,6 +16,7 @@ describe('FolderSizeCell', () => {
       providers: [{ provide: FolderSizes, useValue: sizes }],
     });
     fixture = TestBed.createComponent(FolderSizeCell);
+    fixture.componentRef.setInput('source', 'lab');
     fixture.componentRef.setInput('bucket', 'photos');
     fixture.componentRef.setInput('prefix', '2024/');
     fixture.componentRef.setInput('labelled', true);
@@ -24,7 +25,7 @@ describe('FolderSizeCell', () => {
 
   it('starts a calculation on click', () => {
     (fixture.nativeElement.querySelector('button') as HTMLButtonElement).click();
-    expect(sizes.start).toHaveBeenCalledWith('photos', '2024/');
+    expect(sizes.start).toHaveBeenCalledWith('lab', 'photos', '2024/');
   });
 
   it('shows progress, the result and errors', async () => {

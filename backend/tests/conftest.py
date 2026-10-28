@@ -6,7 +6,14 @@ from moto import mock_aws
 from s3_browser.config import Settings
 from s3_browser.main import create_app
 
-CREDS = {"endpoint": "", "access_key": "test", "secret_key": "test", "region": "us-east-1"}
+SECRET = "s3cr3t-value-xyz"
+SOURCE = {
+    "name": "Moto",
+    "endpoint": "",
+    "region": "us-east-1",
+    "access_key": "test",
+    "secret_key": SECRET,
+}
 
 
 @pytest.fixture(autouse=True)
@@ -31,8 +38,8 @@ def aws(monkeypatch):
 
 
 @pytest.fixture
-def settings() -> Settings:
-    return Settings()
+def settings(tmp_path) -> Settings:
+    return Settings(data_dir=tmp_path / "data")
 
 
 @pytest.fixture
@@ -41,7 +48,8 @@ def client(settings) -> TestClient:
 
 
 @pytest.fixture
-def connected(client) -> TestClient:
-    response = client.post("/api/session", json=CREDS)
-    assert response.status_code == 200, response.text
-    return client
+def source(client) -> str:
+    """Id of a saved source pointing at the moto mock."""
+    response = client.post("/api/sources", json=SOURCE)
+    assert response.status_code == 201, response.text
+    return response.json()["id"]

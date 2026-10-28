@@ -34,10 +34,12 @@ CI fails if the committed client is out of date.
 ```
 src/app/
   api/                 generated API client (models + typed functions)
-  core/                session store, folder-size streams, theme, notifier, guard, interceptor
-  layout/top-bar/      toolbar: endpoint, bucket picker, theme toggle, disconnect
-  pages/connect/       connection form
-  pages/buckets/       bucket list
-  pages/browser/       folder view: /b/<bucket>/<folder path>
-  shared/              breadcrumbs, folder size cell, bytes pipe, API error helper
+  core/                sources store, folder-size streams, theme, notifier, guards, interceptor
+  layout/top-bar/      toolbar: source picker, TLS badge, bucket picker, sources, theme toggle
+  pages/sources/       list of saved sources with connection status
+  pages/source-form/   add / edit a source (incl. TLS / CA options)
+  pages/buckets/       buckets of a source: /s/<source>
+  pages/browser/       folder view: /s/<source>/<bucket>/<folder path>
+  shared/              breadcrumbs, folder size cell, bytes pipe, TLS badge, API error helper
+  testing/             test fixtures
 ```

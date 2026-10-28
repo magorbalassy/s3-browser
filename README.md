@@ -4,50 +4,60 @@ A small web UI for browsing S3-compatible storage (AWS S3, MinIO, Ceph, Garage, 
 folder sizes on demand. It ships as one container: a FastAPI backend serving the API and the
 Angular app.
 
-- Browse buckets and folders. URLs mirror the S3 path (`/b/<bucket>/<folder>/…`), so deep links
-  and the back button work.
+- Save several S3 sources (endpoints with their keys) and switch between them from the top bar.
+  Sources are stored server side in SQLite, with secret keys encrypted.
+- Browse buckets and folders. URLs mirror the S3 path (`/s/<source>/<bucket>/<folder>/…`), so deep
+  links and the back button work.
 - Folder sizes are calculated on request and streamed live while the objects are counted.
 - Sort, filter, copy keys, download files (short-lived presigned URLs). Large folders load page by
   page.
-- Credentials stay on the server: the browser only holds an HttpOnly session cookie.
+- Custom CA certificates or skipped TLS verification per source, for private S3 endpoints.
 - Light / dark / system theme, works on mobile.
 
 ## Run it
 
 ```bash
-docker run -d --name s3-browser -p 8080:8080 magorbalassy/s3-browser:latest
+docker run -d --name s3-browser -p 8080:8080 -v s3-browser-data:/data magorbalassy/s3-browser:latest
 ```
 
-Open http://localhost:8080 and enter the endpoint URL (leave it empty for AWS S3), access key and
-secret key.
+Open http://localhost:8080 and add your first source: a name, the endpoint URL (leave it empty for
+AWS S3), access key and secret key. **Test connection** checks the settings without saving; saving
+tests them too (with an option to save anyway if the endpoint is down right now). Add more sources
+any time from **Sources** (the gear icon), and switch between them with the source picker.
+
+The `/data` volume holds the database (`s3-browser.db`) and, unless you set `SECRET_KEY`, the
+generated encryption key (`secret.key`). Back them up together: without the key, the stored secret
+keys cannot be decrypted (you would have to re-enter them).
+
+There is no login: everyone who can open the UI can use and edit all saved sources. Keep it on a
+trusted network or behind an authenticating reverse proxy.
 
 ### HTTPS endpoints with private certificates
 
-The connect page has a **TLS / certificates** section (used for every endpoint except plain `http://`; an endpoint without a scheme is treated as `https://`):
+The source form has a **TLS / certificates** section (used for every endpoint except plain
+`http://`; an endpoint without a scheme is treated as `https://`):
 
 - **Custom CA certificate**: paste the PEM or load the file (`.pem` / `.crt`) of the CA that signed
   the endpoint's certificate (self-signed or internal CA). It is trusted in addition to the public
-  CAs, for that connection only.
+  CAs, for that source only.
 - **Skip certificate verification**: still encrypted, but the server's identity is not checked.
-  The endpoint badge in the top bar turns red while such a connection is active.
+  The badge next to the source picker turns red for such sources.
 
 Downloads go from the browser straight to the S3 endpoint, so for downloads the browser itself must
 trust that certificate.
 
 ### Configuration
 
-| Variable            | Default | Description                                                                                                        |
-| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
-| `PORT`              | `8080`  | Port to listen on                                                                                                  |
-| `SESSION_TTL`       | `3600`  | Seconds of inactivity after which a session (and its credentials) is dropped                                       |
-| `ALLOWED_ENDPOINTS` | _(any)_ | Comma-separated list of endpoint URLs users may connect to (an empty item allows AWS S3). Recommended when exposed |
-| `COOKIE_SECURE`     | `false` | Set to `true` when served over HTTPS (e.g. behind a TLS reverse proxy)                                             |
-| `LOG_LEVEL`         | `INFO`  | Python log level                                                                                                   |
+| Variable            | Default            | Description                                                                                                         |
+| ------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `PORT`              | `8080`             | Port to listen on                                                                                                   |
+| `DATA_DIR`          | `/data` (`./data`) | Where the SQLite database and the generated key are stored (`./data` when run outside the container)                |
+| `SECRET_KEY`        | _(generated)_      | Passphrase that encrypts stored secret keys. If unset, a random key is created in `DATA_DIR`. Don't change it later |
+| `ALLOWED_ENDPOINTS` | _(any)_            | Comma-separated list of endpoint URLs sources may use (an empty item allows AWS S3). Recommended when exposed       |
+| `LOG_LEVEL`         | `INFO`             | Python log level                                                                                                    |
 
 Notes:
 
-- Sessions are kept in memory, so the server runs a single worker; restarting the container logs
-  everyone out.
 - Without `ALLOWED_ENDPOINTS`, anyone who can open the UI can make the server connect to any URL.
   Set it, or keep the UI on a trusted network.
 - Downloads redirect the browser to the S3 endpoint itself, so that endpoint must be reachable from

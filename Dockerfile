@@ -24,7 +24,8 @@ LABEL org.opencontainers.image.title="s3-browser" \
       org.opencontainers.image.description="Browse S3-compatible storage and calculate folder sizes" \
       org.opencontainers.image.source="https://github.com/magorbalassy/s3-browser"
 
-RUN useradd --system --uid 10001 --no-create-home app
+RUN useradd --system --uid 10001 --no-create-home app \
+ && mkdir /data && chown app /data
 WORKDIR /app
 COPY --from=backend /app/.venv /app/.venv
 COPY --from=frontend /src/dist/s3-browser/browser /app/static
@@ -32,12 +33,14 @@ COPY --from=frontend /src/dist/s3-browser/browser /app/static
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     STATIC_DIR=/app/static \
+    DATA_DIR=/data \
     PORT=8080
 
 USER app
+# Saved sources (SQLite) and the generated encryption key live here: mount a volume.
+VOLUME /data
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/api/health', timeout=3)"]
 
-# Single worker on purpose: sessions are kept in memory.
 CMD ["s3-browser", "serve"]

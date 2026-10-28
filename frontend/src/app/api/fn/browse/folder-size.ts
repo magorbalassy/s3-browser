@@ -11,6 +11,11 @@ import { SizeProgress } from '../../models/size-progress';
 
 export interface FolderSize$Params {
   bucket: string;
+
+/**
+ * Source id
+ */
+  source_id: string;
   prefix?: string;
 }
 
@@ -18,6 +23,7 @@ export function folderSize(http: HttpClient, rootUrl: string, params: FolderSize
   const rb = new RequestBuilder(rootUrl, folderSize.PATH, 'get');
   if (params) {
     rb.path('bucket', params.bucket, {});
+    rb.path('source_id', params.source_id, {});
     rb.query('prefix', params.prefix, {});
   }
 
@@ -31,4 +37,4 @@ export function folderSize(http: HttpClient, rootUrl: string, params: FolderSize
   );
 }
 
-folderSize.PATH = '/api/buckets/{bucket}/size';
+folderSize.PATH = '/api/sources/{source_id}/buckets/{bucket}/size';

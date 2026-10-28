@@ -20,7 +20,9 @@
   <span class="running" aria-live="polite">
     <mat-spinner diameter="16" />
     <span>{{ s.bytes | bytes }}</span>
-    <span class="muted">· {{ s.objects | number }} objects</span>
+    <span class="muted"
+      >· {{ s.objects | number }} {{ s.objects === 1 ? 'object' : 'objects' }}</span
+    >
     <button mat-icon-button class="small" (click)="cancel()" matTooltip="Stop" aria-label="Stop">
       <mat-icon>close</mat-icon>
     </button>
@@ -34,10 +36,15 @@
     </button>
   </span>
 } @else {
-  <span class="done" [matTooltip]="(s.objects | number) + ' objects'">
+  <span
+    class="done"
+    [matTooltip]="(s.objects | number) + (s.objects === 1 ? ' object' : ' objects')"
+  >
     <span>{{ s.bytes | bytes }}</span>
     @if (labelled()) {
-      <span class="muted">in {{ s.objects | number }} objects</span>
+      <span class="muted"
+        >in {{ s.objects | number }} {{ s.objects === 1 ? 'object' : 'objects' }}</span
+      >
     }
     <button
       mat-icon-button

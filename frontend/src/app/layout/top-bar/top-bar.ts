@@ -1,21 +1,26 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map } from 'rxjs';
-import { FolderSizes } from '../../core/folder-sizes';
-import { SessionStore } from '../../core/session-store';
+import { SourcesStore } from '../../core/sources-store';
 import { Theme } from '../../core/theme';
+import { endpointLabel, tlsBadge } from '../../shared/tls';
+
+/** Value of the "Manage sources…" entry in the source picker. */
+const MANAGE = '\u0000manage';
 
 @Component({
   imports: [
     RouterLink,
     MatToolbarModule,
     MatButtonModule,
+    MatDividerModule,
     MatIconModule,
     MatSelectModule,
     MatTooltipModule,
@@ -25,10 +30,10 @@ import { Theme } from '../../core/theme';
   templateUrl: './top-bar.html',
 })
 export class TopBar {
-  protected readonly session = inject(SessionStore);
+  protected readonly store = inject(SourcesStore);
   protected readonly theme = inject(Theme);
-  private readonly sizes = inject(FolderSizes);
   private readonly router = inject(Router);
+  protected readonly manage = MANAGE;
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -38,38 +43,50 @@ export class TopBar {
     { initialValue: this.router.url },
   );
 
-  /** The bucket being browsed, read from the URL (/b/<bucket>/...). */
-  protected readonly bucket = computed(() => {
+  /** Source and bucket being browsed, read from the URL (/s/<source>/<bucket>/...). */
+  private readonly location = computed(() => {
     const segments = this.router.parseUrl(this.url()).root.children['primary']?.segments ?? [];
-    return segments.length >= 2 && segments[0].path === 'b' ? segments[1].path : '';
+    const inSource = segments.length >= 2 && segments[0].path === 's';
+    return {
+      source: inSource ? segments[1].path : '',
+      bucket: inSource && segments.length >= 3 ? segments[2].path : '',
+    };
   });
-
-  /** How the connection's TLS is set up, shown next to the endpoint. */
+  protected readonly sourceId = computed(() => this.location().source);
+  protected readonly bucket = computed(() => this.location().bucket);
+  protected readonly source = computed(() =>
+    this.store.sources().find((s) => s.id === this.sourceId()),
+  );
+  protected readonly buckets = computed(() => {
+    const id = this.sourceId();
+    return id ? (this.store.bucketsOf(id)()?.buckets ?? []) : [];
+  });
   protected readonly tls = computed(() => {
-    const info = this.session.info();
-    const region = `Region: ${info?.region ?? ''}`;
-    if (info && !info.verify_tls) {
-      return { icon: 'gpp_bad', insecure: true, tooltip: `TLS verification is off · ${region}` };
+    const source = this.source();
+    if (!source) {
+      return undefined;
     }
-    if (info?.custom_ca) {
-      return {
-        icon: 'verified_user',
-        insecure: false,
-        tooltip: `Trusted via custom CA · ${region}`,
-      };
-    }
-    return { icon: 'dns', insecure: false, tooltip: region };
+    const badge = tlsBadge(source);
+    return { ...badge, tooltip: `${endpointLabel(source)} · ${badge.label}` };
   });
 
   protected readonly themeLabel = computed(() => `Theme: ${this.theme.mode()}`);
 
-  protected openBucket(bucket: string): void {
-    this.router.navigate(['/b', bucket]);
+  constructor() {
+    this.store.load().catch(() => undefined);
+    effect(() => {
+      const id = this.sourceId();
+      if (id) {
+        untracked(() => this.store.loadBuckets(id));
+      }
+    });
   }
 
-  protected async logout(): Promise<void> {
-    this.sizes.clear();
-    await this.session.disconnect();
-    this.router.navigate(['/connect']);
+  protected openSource(id: string): void {
+    this.router.navigate(id === MANAGE ? ['/sources'] : ['/s', id]);
+  }
+
+  protected openBucket(bucket: string): void {
+    this.router.navigate(['/s', this.sourceId(), bucket]);
   }
 }

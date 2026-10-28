@@ -10,11 +10,17 @@ import { RequestBuilder } from '../../request-builder';
 import { BucketList } from '../../models/bucket-list';
 
 export interface ListBuckets$Params {
+
+/**
+ * Source id
+ */
+  source_id: string;
 }
 
-export function listBuckets(http: HttpClient, rootUrl: string, params?: ListBuckets$Params, context?: HttpContext): Observable<StrictHttpResponse<BucketList>> {
+export function listBuckets(http: HttpClient, rootUrl: string, params: ListBuckets$Params, context?: HttpContext): Observable<StrictHttpResponse<BucketList>> {
   const rb = new RequestBuilder(rootUrl, listBuckets.PATH, 'get');
   if (params) {
+    rb.path('source_id', params.source_id, {});
   }
 
   return http.request(
@@ -27,4 +33,4 @@ export function listBuckets(http: HttpClient, rootUrl: string, params?: ListBuck
   );
 }
 
-listBuckets.PATH = '/api/buckets';
+listBuckets.PATH = '/api/sources/{source_id}/buckets';

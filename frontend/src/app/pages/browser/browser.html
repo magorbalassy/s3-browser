@@ -7,7 +7,12 @@
   >
     <mat-icon>arrow_upward</mat-icon>
   </a>
-  <app-breadcrumbs [bucket]="bucket()" [prefix]="prefix()" />
+  <app-breadcrumbs
+    [source]="source()"
+    [sourceName]="sourceName()"
+    [bucket]="bucket()"
+    [prefix]="prefix()"
+  />
   <mat-form-field class="filter" subscriptSizing="dynamic">
     <mat-icon matPrefix>search</mat-icon>
     <input
@@ -38,7 +43,7 @@
       <mat-icon>{{ err.status === 404 ? 'search_off' : 'error' }}</mat-icon>
       <p>{{ err.message }}</p>
       <div class="actions">
-        <a mat-stroked-button routerLink="/b">All buckets</a>
+        <a mat-stroked-button [routerLink]="['/s', source()]">All buckets</a>
         <button mat-flat-button (click)="reload()">Try again</button>
       </div>
     </div>
@@ -59,7 +64,12 @@
         <span>Loading…</span>
       }
       <span class="spacer"></span>
-      <app-folder-size-cell [bucket]="bucket()" [prefix]="prefix()" [labelled]="true" />
+      <app-folder-size-cell
+        [source]="source()"
+        [bucket]="bucket()"
+        [prefix]="prefix()"
+        [labelled]="true"
+      />
     </div>
 
     <div class="table-scroll">
@@ -101,7 +111,7 @@
           </th>
           <td mat-cell *matCellDef="let row" class="size-cell">
             @if (row.kind === 'folder') {
-              <app-folder-size-cell [bucket]="bucket()" [prefix]="row.key" />
+              <app-folder-size-cell [source]="source()" [bucket]="bucket()" [prefix]="row.key" />
             } @else {
               <span [title]="(row.size | number) + ' bytes'">{{ row.size | bytes }}</span>
             }

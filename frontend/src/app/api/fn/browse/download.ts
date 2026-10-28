@@ -10,6 +10,11 @@ import { RequestBuilder } from '../../request-builder';
 
 export interface Download$Params {
   bucket: string;
+
+/**
+ * Source id
+ */
+  source_id: string;
   key: string;
 }
 
@@ -17,6 +22,7 @@ export function download(http: HttpClient, rootUrl: string, params: Download$Par
   const rb = new RequestBuilder(rootUrl, download.PATH, 'get');
   if (params) {
     rb.path('bucket', params.bucket, {});
+    rb.path('source_id', params.source_id, {});
     rb.query('key', params.key, {});
   }
 
@@ -30,4 +36,4 @@ export function download(http: HttpClient, rootUrl: string, params: Download$Par
   );
 }
 
-download.PATH = '/api/buckets/{bucket}/download';
+download.PATH = '/api/sources/{source_id}/buckets/{bucket}/download';

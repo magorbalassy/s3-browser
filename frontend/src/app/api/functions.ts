@@ -3,12 +3,18 @@
 
 export type { Health$Params as Health$Params } from './fn/meta/health';
 export { health as health } from './fn/meta/health';
-export type { GetSession$Params as GetSession$Params } from './fn/session/get-session';
-export { getSession as getSession } from './fn/session/get-session';
-export type { Connect$Params as Connect$Params } from './fn/session/connect';
-export { connect as connect } from './fn/session/connect';
-export type { Disconnect$Params as Disconnect$Params } from './fn/session/disconnect';
-export { disconnect as disconnect } from './fn/session/disconnect';
+export type { ListSources$Params as ListSources$Params } from './fn/sources/list-sources';
+export { listSources as listSources } from './fn/sources/list-sources';
+export type { CreateSource$Params as CreateSource$Params } from './fn/sources/create-source';
+export { createSource as createSource } from './fn/sources/create-source';
+export type { TestSource$Params as TestSource$Params } from './fn/sources/test-source';
+export { testSource as testSource } from './fn/sources/test-source';
+export type { GetSource$Params as GetSource$Params } from './fn/sources/get-source';
+export { getSource as getSource } from './fn/sources/get-source';
+export type { UpdateSource$Params as UpdateSource$Params } from './fn/sources/update-source';
+export { updateSource as updateSource } from './fn/sources/update-source';
+export type { DeleteSource$Params as DeleteSource$Params } from './fn/sources/delete-source';
+export { deleteSource as deleteSource } from './fn/sources/delete-source';
 export type { ListBuckets$Params as ListBuckets$Params } from './fn/browse/list-buckets';
 export { listBuckets as listBuckets } from './fn/browse/list-buckets';
 export type { ListObjects$Params as ListObjects$Params } from './fn/browse/list-objects';

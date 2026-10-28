@@ -24,6 +24,7 @@ import { Api } from '../../api/api';
 import { listObjects } from '../../api/functions';
 import { ObjectPage } from '../../api/models';
 import { Notifier } from '../../core/notifier';
+import { SourcesStore } from '../../core/sources-store';
 import { toApiError } from '../../shared/api-error';
 import { Breadcrumbs } from '../../shared/breadcrumbs/breadcrumbs';
 import { BytesPipe } from '../../shared/bytes-pipe';
@@ -42,7 +43,7 @@ interface Listing {
   nextToken: string | null;
 }
 
-/** Browse one folder (S3 prefix) of a bucket. The URL is /b/<bucket>/<folder path>. */
+/** Browse one folder (S3 prefix) of a bucket. The URL is /s/<source>/<bucket>/<folder path>. */
 @Component({
   imports: [
     Breadcrumbs,
@@ -69,22 +70,28 @@ export class Browser {
   private readonly api = inject(Api);
   private readonly notifier = inject(Notifier);
   private readonly title = inject(Title);
+  private readonly store = inject(SourcesStore);
 
   /** Route params (see bucketPathMatcher). */
+  readonly source = input.required<string>();
   readonly bucket = input.required<string>();
   readonly path = input('');
 
   protected readonly prefix = computed(() => (this.path() ? `${this.path()}/` : ''));
+  protected readonly sourceName = computed(() => this.store.byId(this.source())?.name ?? '');
   protected readonly parentLink = computed(() => {
     const folders = this.path().split('/').filter(Boolean);
-    return folders.length ? ['/b', this.bucket(), ...folders.slice(0, -1)] : ['/b'];
+    return folders.length
+      ? ['/s', this.source(), this.bucket(), ...folders.slice(0, -1)]
+      : ['/s', this.source()];
   });
 
   /** The first page of the current folder; reloads whenever the URL changes. */
   private readonly firstPage = resource({
-    params: () => ({ bucket: this.bucket(), prefix: this.prefix() }),
+    params: () => ({ source: this.source(), bucket: this.bucket(), prefix: this.prefix() }),
     loader: ({ params }) =>
       this.api.invoke(listObjects, {
+        source_id: params.source,
         bucket: params.bucket,
         prefix: params.prefix,
         limit: PAGE_SIZE,
@@ -118,7 +125,7 @@ export class Browser {
 
   /** Name filter; a new folder starts unfiltered. */
   protected readonly filter = linkedSignal({
-    source: () => `${this.bucket()}/${this.prefix()}`,
+    source: () => `${this.source()}/${this.bucket()}/${this.prefix()}`,
     computation: () => '',
   });
   protected readonly sort = signal<Sort>({ active: 'name', direction: 'asc' });
@@ -126,6 +133,7 @@ export class Browser {
 
   protected readonly rows = computed<Row[]>(() => {
     const { folders, files } = this.listing();
+    const source = this.source();
     const bucket = this.bucket();
     const term = this.filter().trim().toLowerCase();
     const matches = (name: string) => !term || name.toLowerCase().includes(term);
@@ -136,7 +144,7 @@ export class Browser {
         kind: 'folder',
         name: f.name,
         key: f.prefix,
-        link: ['/b', bucket, ...f.prefix.split('/').filter(Boolean)],
+        link: ['/s', source, bucket, ...f.prefix.split('/').filter(Boolean)],
       }));
     const fileRows: Row[] = files
       .filter((f) => matches(f.name))
@@ -147,7 +155,8 @@ export class Browser {
         size: f.size,
         modified: new Date(f.last_modified),
         download:
-          `/api/buckets/${encodeURIComponent(bucket)}/download` +
+          `/api/sources/${encodeURIComponent(source)}/buckets/${encodeURIComponent(bucket)}` +
+          `/download` +
           `?key=${encodeURIComponent(f.key)}`,
       }));
 
@@ -167,7 +176,7 @@ export class Browser {
 
   constructor() {
     effect(() => {
-      const location = `${this.bucket()}/${this.prefix()}`;
+      const location = `${this.sourceName() || this.source()}: ${this.bucket()}/${this.prefix()}`;
       this.title.setTitle(`${location} · S3 Browser`);
     });
   }
@@ -184,6 +193,7 @@ export class Browser {
     this.loadingMore.set(true);
     try {
       const page = await this.api.invoke(listObjects, {
+        source_id: this.source(),
         bucket: this.bucket(),
         prefix: this.prefix(),
         token: current.nextToken,

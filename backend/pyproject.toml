@@ -5,6 +5,7 @@ description = "Browse S3-compatible storage and calculate folder sizes on demand
 requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.35",
+    "cryptography>=50.0.2",
     "fastapi>=0.115",
     "typer>=0.12",
     "uvicorn[standard]>=0.30",

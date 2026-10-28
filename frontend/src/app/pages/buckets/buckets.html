@@ -1,9 +1,18 @@
 <header class="page-header">
-  <div>
-    <h1>Buckets</h1>
+  <div class="title">
+    <h1>{{ info()?.name }}</h1>
     <p class="subtitle">
-      {{ session.buckets().length }} {{ session.buckets().length === 1 ? 'bucket' : 'buckets' }} on
-      {{ session.endpointLabel() }}
+      @if (tls(); as t) {
+        <mat-icon inline [class.insecure]="t.insecure" [matTooltip]="t.label">{{
+          t.icon
+        }}</mat-icon>
+      }
+      {{ endpoint() }}
+      @if (state(); as s) {
+        @if (!s.loading && !s.error) {
+          · {{ buckets().length }} {{ buckets().length === 1 ? 'bucket' : 'buckets' }}
+        }
+      }
     </p>
   </div>
   <span class="spacer"></span>
@@ -17,29 +26,46 @@
       (input)="filter.set($any($event.target).value)"
     />
   </mat-form-field>
+  <a
+    mat-icon-button
+    [routerLink]="['/sources', source()]"
+    matTooltip="Edit source"
+    aria-label="Edit source"
+  >
+    <mat-icon>edit</mat-icon>
+  </a>
   <button mat-icon-button (click)="refresh()" matTooltip="Refresh" aria-label="Refresh">
     <mat-icon>refresh</mat-icon>
   </button>
 </header>
 
 <div class="panel">
-  @if (refreshing()) {
+  @if (state()?.loading) {
     <mat-progress-bar mode="indeterminate" />
   }
-  @if (visible().length) {
+  @if (state()?.error; as err) {
+    <div class="empty error" role="alert">
+      <mat-icon>cloud_off</mat-icon>
+      <p>{{ err.message }}</p>
+      <div class="actions">
+        <a mat-stroked-button [routerLink]="['/sources', source()]">Edit source</a>
+        <button mat-flat-button (click)="refresh()">Try again</button>
+      </div>
+    </div>
+  } @else if (visible().length) {
     <mat-nav-list>
       @for (name of visible(); track name) {
-        <a mat-list-item [routerLink]="['/b', name]">
+        <a mat-list-item [routerLink]="['/s', source(), name]">
           <mat-icon matListItemIcon>deployed_code</mat-icon>
           <span matListItemTitle>{{ name }}</span>
           <span matListItemMeta class="chevron"><mat-icon>chevron_right</mat-icon></span>
         </a>
       }
     </mat-nav-list>
-  } @else {
+  } @else if (!state()?.loading) {
     <div class="empty">
       <mat-icon>inventory_2</mat-icon>
-      @if (session.buckets().length) {
+      @if (buckets().length) {
         <p>No bucket matches “{{ filter() }}”.</p>
       } @else {
         <p>These credentials cannot see any buckets.</p>

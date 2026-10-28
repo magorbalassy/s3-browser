@@ -11,6 +11,11 @@ import { ObjectPage } from '../../models/object-page';
 
 export interface ListObjects$Params {
   bucket: string;
+
+/**
+ * Source id
+ */
+  source_id: string;
   prefix?: string;
   token?: (string | null);
   limit?: number;
@@ -20,6 +25,7 @@ export function listObjects(http: HttpClient, rootUrl: string, params: ListObjec
   const rb = new RequestBuilder(rootUrl, listObjects.PATH, 'get');
   if (params) {
     rb.path('bucket', params.bucket, {});
+    rb.path('source_id', params.source_id, {});
     rb.query('prefix', params.prefix, {});
     rb.query('token', params.token, {});
     rb.query('limit', params.limit, {});
@@ -35,4 +41,4 @@ export function listObjects(http: HttpClient, rootUrl: string, params: ListObjec
   );
 }
 
-listObjects.PATH = '/api/buckets/{bucket}/objects';
+listObjects.PATH = '/api/sources/{source_id}/buckets/{bucket}/objects';

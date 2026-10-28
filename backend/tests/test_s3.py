@@ -1,7 +1,7 @@
 from botocore.exceptions import ClientError, EndpointConnectionError
 
 from s3_browser.s3 import S3Browser, translate
-from s3_browser.sessions import SessionStore
+from s3_browser.sources import slugify
 
 
 def _client_error(code: str) -> ClientError:
@@ -31,20 +31,10 @@ def test_size():
     assert browser.size("empty") == (0, 0)
 
 
-def test_session_store_expiry(monkeypatch):
-    import s3_browser.sessions as sessions
-
-    # Far beyond any real uptime, so the test fails if code bypasses the fake clock.
-    now = [10.0**9]
-    monkeypatch.setattr(sessions.time, "monotonic", lambda: now[0])
-    store = SessionStore(ttl=60)
-    session = store.create(S3Browser("", "test", "test"))
-    assert store.get(session.id) is session
-    now[0] += 59
-    assert store.get(session.id) is session  # access refreshes the idle timer
-    now[0] += 61
-    assert store.get(session.id) is None
-    assert len(store) == 0
+def test_slugify():
+    assert slugify("Prod MinIO (EU)") == "prod-minio-eu"
+    assert slugify("!!!") == "source"
+    assert len(slugify("x" * 100)) == 40
 
 
 def test_repr_hides_secrets():

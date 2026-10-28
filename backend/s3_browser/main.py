@@ -6,29 +6,36 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, FastAPI, Query, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Query, Request
+from fastapi import Path as PathParam
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .clients import ClientCache
 from .config import Settings
+from .crypto import SecretBox
 from .models import (
     BucketList,
-    ConnectRequest,
+    ConnectionTest,
     ErrorResponse,
     Health,
     ObjectPage,
-    SessionInfo,
     SizeProgress,
+    Source,
+    SourceIn,
+    SourceList,
 )
 from .s3 import MAX_PAGE_SIZE, S3Browser, S3Error, translate
-from .sessions import COOKIE_NAME, Session, SessionStore
+from .sources import SourceRepo
 
 log = logging.getLogger("s3_browser")
 
 ERROR_RESPONSES: dict[int | str, dict] = {
-    status: {"model": ErrorResponse} for status in (400, 401, 403, 404, 422, 502, 504)
+    status: {"model": ErrorResponse} for status in (400, 403, 404, 409, 422, 500, 502, 504)
 }
+
+SourceId = Annotated[str, PathParam(pattern=r"^[a-z0-9-]{1,64}$", description="Source id")]
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -36,11 +43,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     logging.basicConfig(
         level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
-    store = SessionStore(settings.session_ttl)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    repo = SourceRepo(
+        settings.data_dir / "s3-browser.db", SecretBox(settings.data_dir, settings.secret_key)
+    )
+    clients = ClientCache(repo)
 
     app = FastAPI(
         title="S3 Browser",
-        version="0.2.0",
+        version="0.3.0",
         docs_url="/api/docs",
         redoc_url=None,
         openapi_url="/api/openapi.json",
@@ -48,7 +59,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         generate_unique_id_function=lambda route: route.name,
     )
     app.state.settings = settings
-    app.state.sessions = store
+    app.state.sources = repo
+    app.state.clients = clients
 
     # ----- errors: one JSON shape ({code, message}) for every failure -----
 
@@ -68,7 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error_handler(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = {401: "not_connected", 404: "not_found"}.get(exc.status_code, "http_error")
+        code = {404: "not_found"}.get(exc.status_code, "http_error")
         return JSONResponse(
             {"code": code, "message": str(exc.detail)},
             status_code=exc.status_code,
@@ -85,17 +97,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers.setdefault("Cache-Control", "no-store")
         return response
 
-    # ----- dependencies -----
+    # ----- helpers -----
 
-    def current_session(
-        session_id: Annotated[str | None, Cookie(alias=COOKIE_NAME)] = None,
-    ) -> Session:
-        session = store.get(session_id)
-        if session is None:
-            raise StarletteHTTPException(401, "Not connected to an S3 endpoint.")
-        return session
+    def check_allowed(endpoint: str) -> None:
+        if settings.allowed_endpoints and endpoint not in settings.allowed_endpoints:
+            raise S3Error("endpoint_not_allowed", "This endpoint is not allowed.", 403)
 
-    SessionDep = Annotated[Session, Depends(current_session)]
+    def probe(data: SourceIn, source_id: str | None = None) -> list[str]:
+        """List buckets with these settings; the stored secret is used if none is given."""
+        check_allowed(data.endpoint)
+        if data.secret_key is not None:
+            secret = data.secret_key.get_secret_value()
+        elif source_id is not None:
+            secret = repo.credentials(source_id).secret_key
+        else:
+            raise S3Error("validation_error", "secret_key: Field required", 422)
+        browser = S3Browser(
+            data.endpoint,
+            data.access_key,
+            secret,
+            data.region,
+            verify_tls=data.verify_tls,
+            ca_cert=data.ca_cert,
+        )
+        try:
+            return browser.list_buckets()
+        finally:
+            browser.close()
+
+    def client(source_id: SourceId) -> S3Browser:
+        return clients.get(source_id)
+
+    ClientDep = Annotated[S3Browser, Depends(client)]
 
     # ----- routes -----
 
@@ -105,95 +138,89 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> Health:
         return Health(status="ok")
 
-    @api.post("/session", response_model=SessionInfo, tags=["session"])
-    def connect(
-        body: ConnectRequest,
-        response: Response,
-        session_id: Annotated[str | None, Cookie(alias=COOKIE_NAME)] = None,
-    ) -> SessionInfo:
-        """Connect to an S3 endpoint. On success the credentials are kept server side."""
-        if settings.allowed_endpoints and body.endpoint not in settings.allowed_endpoints:
-            raise S3Error("endpoint_not_allowed", "This endpoint is not allowed.", 403)
-        browser = S3Browser(
-            body.endpoint,
-            body.access_key,
-            body.secret_key.get_secret_value(),
-            body.region,
-            verify_tls=body.verify_tls,
-            ca_cert=body.ca_cert,
-        )
+    @api.get("/sources", response_model=SourceList, tags=["sources"])
+    def list_sources() -> SourceList:
+        return SourceList(sources=repo.list())
+
+    @api.post("/sources", response_model=Source, status_code=201, tags=["sources"])
+    def create_source(body: SourceIn, test: bool = True) -> Source:
+        """Save a new source. By default the connection is tested first."""
+        if body.secret_key is None:
+            raise S3Error("validation_error", "secret_key: Field required", 422)
+        if test:
+            probe(body)
+        else:
+            check_allowed(body.endpoint)
+        source = repo.create(body)
+        log.info("Added source %s (%s)", source.id, source.endpoint or "AWS S3")
+        return source
+
+    @api.post("/sources/test", response_model=ConnectionTest, tags=["sources"])
+    def test_source(body: SourceIn, source_id: str | None = None) -> ConnectionTest:
+        """Try these settings without saving. With `source_id`, a missing secret is reused."""
         try:
-            buckets = browser.list_buckets()  # also verifies the credentials
-        except Exception:
-            browser.close()
-            raise
-        store.remove(session_id)
-        session = store.create(browser)
-        response.set_cookie(
-            COOKIE_NAME,
-            session.id,
-            max_age=settings.session_ttl,
-            httponly=True,
-            samesite="strict",
-            secure=settings.cookie_secure,
-            path="/api",
-        )
-        log.info(
-            "Connected to %s (%d buckets%s)",
-            body.endpoint or "AWS S3",
-            len(buckets),
-            "" if body.verify_tls else ", TLS verification off",
-        )
-        return _session_info(browser, buckets)
+            return ConnectionTest(ok=True, buckets=probe(body, source_id))
+        except S3Error as err:
+            return ConnectionTest(ok=False, error=ErrorResponse(code=err.code, message=err.message))
 
-    @api.get("/session", response_model=SessionInfo, tags=["session"])
-    def get_session(session: SessionDep) -> SessionInfo:
-        return _session_info(session.browser, session.browser.list_buckets())
+    @api.get("/sources/{source_id}", response_model=Source, tags=["sources"])
+    def get_source(source_id: SourceId) -> Source:
+        return repo.get(source_id)
 
-    @api.delete("/session", status_code=204, tags=["session"])
-    def disconnect(
-        response: Response,
-        session_id: Annotated[str | None, Cookie(alias=COOKIE_NAME)] = None,
-    ) -> None:
-        store.remove(session_id)
-        response.delete_cookie(COOKIE_NAME, path="/api")
+    @api.put("/sources/{source_id}", response_model=Source, tags=["sources"])
+    def update_source(source_id: SourceId, body: SourceIn, test: bool = True) -> Source:
+        """Change a source; leave `secret_key` out to keep the stored one."""
+        repo.get(source_id)  # 404 before testing anything
+        if test:
+            probe(body, source_id)
+        else:
+            check_allowed(body.endpoint)
+        source = repo.update(source_id, body)
+        clients.invalidate(source_id)
+        return source
 
-    @api.get("/buckets", response_model=BucketList, tags=["browse"])
-    def list_buckets(session: SessionDep) -> BucketList:
-        return BucketList(buckets=session.browser.list_buckets())
+    @api.delete("/sources/{source_id}", status_code=204, tags=["sources"])
+    def delete_source(source_id: SourceId) -> None:
+        repo.delete(source_id)
+        clients.invalidate(source_id)
+        log.info("Deleted source %s", source_id)
 
-    @api.get("/buckets/{bucket}/objects", response_model=ObjectPage, tags=["browse"])
+    browse = APIRouter(prefix="/sources/{source_id}", tags=["browse"])
+
+    @browse.get("/buckets", response_model=BucketList)
+    def list_buckets(s3: ClientDep) -> BucketList:
+        return BucketList(buckets=s3.list_buckets())
+
+    @browse.get("/buckets/{bucket}/objects", response_model=ObjectPage)
     def list_objects(
         bucket: str,
-        session: SessionDep,
+        s3: ClientDep,
         prefix: str = "",
         token: str | None = None,
         limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = 200,
     ) -> ObjectPage:
         """Direct children (folders and files) of `prefix`, one page at a time."""
-        folders, files, next_token = session.browser.list_page(bucket, prefix, token, limit)
+        folders, files, next_token = s3.list_page(bucket, prefix, token, limit)
         return ObjectPage(
             bucket=bucket, prefix=prefix, folders=folders, files=files, next_token=next_token
         )
 
-    @api.get(
+    @browse.get(
         "/buckets/{bucket}/size",
-        tags=["browse"],
         response_class=StreamingResponse,
         responses={200: {"model": SizeProgress, "content": {"text/event-stream": {}}}},
     )
-    def folder_size(bucket: str, session: SessionDep, prefix: str = "") -> StreamingResponse:
+    def folder_size(bucket: str, s3: ClientDep, prefix: str = "") -> StreamingResponse:
         """Stream the running size of everything under `prefix` as Server-Sent Events."""
-        browser = session.browser
 
         def events() -> Iterator[str]:
             total_bytes = total_objects = 0
             try:
-                for total_bytes, total_objects in browser.iter_size(bucket, prefix):
+                for total_bytes, total_objects in s3.iter_size(bucket, prefix):
                     yield _sse(SizeProgress(bytes=total_bytes, objects=total_objects, done=False))
                 yield _sse(SizeProgress(bytes=total_bytes, objects=total_objects, done=True))
             except Exception as exc:  # noqa: BLE001 - reported to the client as an event
-                err = translate(exc, browser.endpoint)
+                err = translate(exc, s3.endpoint)
                 yield _sse(
                     SizeProgress(
                         bytes=total_bytes,
@@ -209,15 +236,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
 
-    @api.get(
-        "/buckets/{bucket}/download",
-        tags=["browse"],
-        status_code=307,
-        response_class=RedirectResponse,
-    )
-    def download(bucket: str, key: str, session: SessionDep) -> RedirectResponse:
+    @browse.get("/buckets/{bucket}/download", status_code=307, response_class=RedirectResponse)
+    def download(bucket: str, key: str, s3: ClientDep) -> RedirectResponse:
         """Redirect to a short-lived presigned URL (the browser must reach the S3 endpoint)."""
-        return RedirectResponse(session.browser.download_url(bucket, key), status_code=307)
+        return RedirectResponse(s3.download_url(bucket, key), status_code=307)
+
+    api.include_router(browse)
 
     @api.api_route(
         "/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False
@@ -231,16 +255,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         _mount_spa(app, settings.static_dir.resolve())
 
     return app
-
-
-def _session_info(browser: S3Browser, buckets: list[str]) -> SessionInfo:
-    return SessionInfo(
-        endpoint=browser.endpoint,
-        region=browser.region,
-        verify_tls=browser.verify_tls,
-        custom_ca=bool(browser.ca_cert),
-        buckets=buckets,
-    )
 
 
 def _sse(event: SizeProgress) -> str:
@@ -265,4 +279,14 @@ def _mount_spa(app: FastAPI, root: Path) -> None:
 _HASHED = re.compile(r"-[A-Za-z0-9]{8}\.(js|css|woff2?|svg|png|jpg|webp)$")
 
 
-app = create_app()
+_app: FastAPI | None = None
+
+
+def __getattr__(name: str) -> FastAPI:
+    """`s3_browser.main:app`, created on first use (so importing has no side effects)."""
+    global _app
+    if name == "app":
+        if _app is None:
+            _app = create_app()
+        return _app
+    raise AttributeError(name)

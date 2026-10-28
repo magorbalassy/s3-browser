@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "S3 Browser",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
     "/api/health": {
@@ -33,16 +33,6 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "403": {
             "description": "Forbidden",
             "content": {
@@ -63,8 +53,28 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -96,49 +106,20 @@
         }
       }
     },
-    "/api/session": {
-      "post": {
+    "/api/sources": {
+      "get": {
         "tags": [
-          "session"
+          "sources"
         ],
-        "summary": "Connect",
-        "description": "Connect to an S3 endpoint. On success the credentials are kept server side.",
-        "operationId": "connect",
-        "parameters": [
-          {
-            "name": "s3b_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConnectRequest"
-              }
-            }
-          }
-        },
+        "summary": "List Sources",
+        "operationId": "list_sources",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionInfo"
+                  "$ref": "#/components/schemas/SourceList"
                 }
               }
             }
@@ -152,16 +133,6 @@
               }
             },
             "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
           },
           "403": {
             "content": {
@@ -183,6 +154,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -192,6 +173,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -215,37 +206,42 @@
           }
         }
       },
-      "get": {
+      "post": {
         "tags": [
-          "session"
+          "sources"
         ],
-        "summary": "Get Session",
-        "operationId": "get_session",
+        "summary": "Create Source",
+        "description": "Save a new source. By default the connection is tested first.",
+        "operationId": "create_source",
         "parameters": [
           {
-            "name": "s3b_session",
-            "in": "cookie",
+            "name": "test",
+            "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
+              "type": "boolean",
+              "default": true,
+              "title": "Test"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceIn"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionInfo"
+                  "$ref": "#/components/schemas/Source"
                 }
               }
             }
@@ -259,16 +255,6 @@
               }
             },
             "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
           },
           "403": {
             "content": {
@@ -290,6 +276,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -299,6 +295,395 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/sources/test": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Test Source",
+        "description": "Try these settings without saving. With `source_id`, a missing secret is reused.",
+        "operationId": "test_source",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      }
+    },
+    "/api/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Get Source",
+        "operationId": "get_source",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Update Source",
+        "description": "Change a source; leave `secret_key` out to keep the stored one.",
+        "operationId": "update_source",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
+          },
+          {
+            "name": "test",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Test"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -324,26 +709,22 @@
       },
       "delete": {
         "tags": [
-          "session"
+          "sources"
         ],
-        "summary": "Disconnect",
-        "operationId": "disconnect",
+        "summary": "Delete Source",
+        "operationId": "delete_source",
         "parameters": [
           {
-            "name": "s3b_session",
-            "in": "cookie",
-            "required": false,
+            "name": "source_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
-            }
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
           }
         ],
         "responses": {
@@ -359,16 +740,6 @@
               }
             },
             "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
           },
           "403": {
             "content": {
@@ -390,6 +761,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -399,6 +780,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -423,7 +814,7 @@
         }
       }
     },
-    "/api/buckets": {
+    "/api/sources/{source_id}/buckets": {
       "get": {
         "tags": [
           "browse"
@@ -432,20 +823,16 @@
         "operationId": "list_buckets",
         "parameters": [
           {
-            "name": "s3b_session",
-            "in": "cookie",
-            "required": false,
+            "name": "source_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
-            }
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
           }
         ],
         "responses": {
@@ -469,16 +856,6 @@
             },
             "description": "Bad Request"
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
           "403": {
             "content": {
               "application/json": {
@@ -499,6 +876,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -508,6 +895,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -532,7 +929,7 @@
         }
       }
     },
-    "/api/buckets/{bucket}/objects": {
+    "/api/sources/{source_id}/buckets/{bucket}/objects": {
       "get": {
         "tags": [
           "browse"
@@ -549,6 +946,18 @@
               "type": "string",
               "title": "Bucket"
             }
+          },
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
           },
           {
             "name": "prefix",
@@ -587,22 +996,6 @@
               "default": 200,
               "title": "Limit"
             }
-          },
-          {
-            "name": "s3b_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
-            }
           }
         ],
         "responses": {
@@ -626,16 +1019,6 @@
             },
             "description": "Bad Request"
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
           "403": {
             "content": {
               "application/json": {
@@ -656,6 +1039,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -665,6 +1058,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -689,7 +1092,7 @@
         }
       }
     },
-    "/api/buckets/{bucket}/size": {
+    "/api/sources/{source_id}/buckets/{bucket}/size": {
       "get": {
         "tags": [
           "browse"
@@ -708,6 +1111,18 @@
             }
           },
           {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
+          },
+          {
             "name": "prefix",
             "in": "query",
             "required": false,
@@ -715,22 +1130,6 @@
               "type": "string",
               "default": "",
               "title": "Prefix"
-            }
-          },
-          {
-            "name": "s3b_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
             }
           }
         ],
@@ -756,16 +1155,6 @@
             },
             "description": "Bad Request"
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
           "403": {
             "content": {
               "application/json": {
@@ -786,6 +1175,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -795,6 +1194,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -819,7 +1228,7 @@
         }
       }
     },
-    "/api/buckets/{bucket}/download": {
+    "/api/sources/{source_id}/buckets/{bucket}/download": {
       "get": {
         "tags": [
           "browse"
@@ -838,28 +1247,24 @@
             }
           },
           {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "description": "Source id",
+              "title": "Source Id"
+            },
+            "description": "Source id"
+          },
+          {
             "name": "key",
             "in": "query",
             "required": true,
             "schema": {
               "type": "string",
               "title": "Key"
-            }
-          },
-          {
-            "name": "s3b_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "S3B Session"
             }
           }
         ],
@@ -876,16 +1281,6 @@
               }
             },
             "description": "Bad Request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
           },
           "403": {
             "content": {
@@ -907,6 +1302,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -916,6 +1321,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           },
           "502": {
             "content": {
@@ -959,56 +1374,35 @@
         ],
         "title": "BucketList"
       },
-      "ConnectRequest": {
+      "ConnectionTest": {
         "properties": {
-          "endpoint": {
-            "type": "string",
-            "maxLength": 2048,
-            "title": "Endpoint",
-            "description": "S3 endpoint URL, e.g. http://minio:9000. Empty means AWS S3.",
-            "default": ""
-          },
-          "access_key": {
-            "type": "string",
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Access Key"
-          },
-          "secret_key": {
-            "type": "string",
-            "maxLength": 256,
-            "minLength": 1,
-            "format": "password",
-            "title": "Secret Key",
-            "writeOnly": true
-          },
-          "region": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Region",
-            "default": "us-east-1"
-          },
-          "verify_tls": {
+          "ok": {
             "type": "boolean",
-            "title": "Verify Tls",
-            "description": "Verify the endpoint's TLS certificate. Disable only for trusted endpoints.",
-            "default": true
+            "title": "Ok"
           },
-          "ca_cert": {
-            "type": "string",
-            "maxLength": 65536,
-            "title": "Ca Cert",
-            "description": "Extra CA certificate(s) in PEM format, trusted in addition to public CAs.",
-            "default": ""
+          "buckets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
-          "access_key",
-          "secret_key"
+          "ok"
         ],
-        "title": "ConnectRequest"
+        "title": "ConnectionTest"
       },
       "ErrorResponse": {
         "properties": {
@@ -1148,43 +1542,6 @@
         ],
         "title": "S3Folder"
       },
-      "SessionInfo": {
-        "properties": {
-          "endpoint": {
-            "type": "string",
-            "title": "Endpoint"
-          },
-          "region": {
-            "type": "string",
-            "title": "Region"
-          },
-          "verify_tls": {
-            "type": "boolean",
-            "title": "Verify Tls"
-          },
-          "custom_ca": {
-            "type": "boolean",
-            "title": "Custom Ca",
-            "description": "A custom CA certificate is in use."
-          },
-          "buckets": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Buckets"
-          }
-        },
-        "type": "object",
-        "required": [
-          "endpoint",
-          "region",
-          "verify_tls",
-          "custom_ca",
-          "buckets"
-        ],
-        "title": "SessionInfo"
-      },
       "SizeProgress": {
         "properties": {
           "bytes": {
@@ -1218,6 +1575,144 @@
         ],
         "title": "SizeProgress",
         "description": "One Server-Sent Event of a folder-size calculation."
+      },
+      "Source": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Stable, URL-safe identifier (used in /s/<id>/...)."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "access_key": {
+            "type": "string",
+            "title": "Access Key"
+          },
+          "verify_tls": {
+            "type": "boolean",
+            "title": "Verify Tls"
+          },
+          "ca_cert": {
+            "type": "string",
+            "title": "Ca Cert"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "endpoint",
+          "region",
+          "access_key",
+          "verify_tls",
+          "ca_cert",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Source",
+        "description": "A saved source. The secret key is write-only and never returned."
+      },
+      "SourceIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Endpoint",
+            "description": "S3 endpoint URL, e.g. https://minio:9000. Empty means AWS S3.",
+            "default": ""
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Region",
+            "default": "us-east-1"
+          },
+          "access_key": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Access Key"
+          },
+          "secret_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256,
+                "minLength": 1,
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret Key"
+          },
+          "verify_tls": {
+            "type": "boolean",
+            "title": "Verify Tls",
+            "description": "Verify the endpoint's TLS certificate. Disable only for trusted endpoints.",
+            "default": true
+          },
+          "ca_cert": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Ca Cert",
+            "description": "Extra CA certificate(s) in PEM format, trusted in addition to public CAs.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "access_key"
+        ],
+        "title": "SourceIn",
+        "description": "A source to create or update. Leave `secret_key` out on update to keep the stored one."
+      },
+      "SourceList": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sources"
+        ],
+        "title": "SourceList"
       }
     }
   }

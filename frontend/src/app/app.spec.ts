@@ -22,20 +22,21 @@ describe('App', () => {
 });
 
 describe('bucketPathMatcher', () => {
-  it('ignores URLs outside /b/<bucket>', () => {
-    expect(bucketPathMatcher(segments('b'))).toBeNull();
-    expect(bucketPathMatcher(segments('connect', 'x'))).toBeNull();
+  it('ignores URLs outside /s/<source>/<bucket>', () => {
+    expect(bucketPathMatcher(segments('s', 'lab'))).toBeNull();
+    expect(bucketPathMatcher(segments('sources', 'lab', 'x'))).toBeNull();
   });
 
   it('matches the bucket root with an empty path', () => {
-    const result = bucketPathMatcher(segments('b', 'photos'))!;
+    const result = bucketPathMatcher(segments('s', 'lab', 'photos'))!;
+    expect(result.posParams!['source'].path).toBe('lab');
     expect(result.posParams!['bucket'].path).toBe('photos');
     expect(result.posParams!['path'].path).toBe('');
   });
 
   it('joins nested folders into the path param', () => {
-    const result = bucketPathMatcher(segments('b', 'photos', '2024', 'jan'))!;
-    expect(result.consumed.length).toBe(4);
+    const result = bucketPathMatcher(segments('s', 'lab', 'photos', '2024', 'jan'))!;
+    expect(result.consumed.length).toBe(5);
     expect(result.posParams!['path'].path).toBe('2024/jan');
   });
 });

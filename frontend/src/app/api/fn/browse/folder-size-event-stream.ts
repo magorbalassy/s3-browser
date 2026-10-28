@@ -10,6 +10,11 @@ import { RequestBuilder } from '../../request-builder';
 
 export interface FolderSize$EventStream$Params {
   bucket: string;
+
+/**
+ * Source id
+ */
+  source_id: string;
   prefix?: string;
 }
 
@@ -17,6 +22,7 @@ export function folderSize$EventStream(http: HttpClient, rootUrl: string, params
   const rb = new RequestBuilder(rootUrl, folderSize$EventStream.PATH, 'get');
   if (params) {
     rb.path('bucket', params.bucket, {});
+    rb.path('source_id', params.source_id, {});
     rb.query('prefix', params.prefix, {});
   }
 
@@ -30,4 +36,4 @@ export function folderSize$EventStream(http: HttpClient, rootUrl: string, params
   );
 }
 
-folderSize$EventStream.PATH = '/api/buckets/{bucket}/size';
+folderSize$EventStream.PATH = '/api/sources/{source_id}/buckets/{bucket}/size';

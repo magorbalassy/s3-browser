@@ -9,7 +9,7 @@ import trustme
 
 from s3_browser.s3 import S3Browser
 
-from .conftest import CREDS
+from .conftest import SOURCE
 
 LIST_BUCKETS = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
@@ -46,37 +46,42 @@ def https_endpoint(ca):
     server.shutdown()
 
 
-def _connect(client, endpoint, **extra):
-    return client.post("/api/session", json={**CREDS, "endpoint": endpoint, **extra})
+def _add(client, endpoint, **extra):
+    body = {**SOURCE, "name": f"tls-{len(extra)}-{extra.get('verify_tls', True)}"}
+    return client.post("/api/sources", json={**body, "endpoint": endpoint, **extra})
 
 
 def test_untrusted_certificate_is_rejected(client, https_endpoint):
-    response = _connect(client, https_endpoint)
+    response = _add(client, https_endpoint)
     assert response.status_code == 502
     assert response.json()["code"] == "tls_error"
 
 
 def test_custom_ca_is_trusted(client, https_endpoint, ca):
     pem = ca.cert_pem.bytes().decode()
-    response = _connect(client, https_endpoint, ca_cert=pem)
-    assert response.status_code == 200, response.text
-    assert response.json()["buckets"] == ["secure"]
-    assert response.json()["custom_ca"] is True
-    assert response.json()["verify_tls"] is True
+    response = _add(client, https_endpoint, ca_cert=pem)
+    assert response.status_code == 201, response.text
+    source = response.json()
+    assert source["ca_cert"].strip() == pem.strip()
+    assert source["verify_tls"] is True
+    buckets = client.get(f"/api/sources/{source['id']}/buckets").json()
+    assert buckets == {"buckets": ["secure"]}
 
 
 def test_verification_can_be_skipped(client, https_endpoint):
-    response = _connect(client, https_endpoint, verify_tls=False)
-    assert response.status_code == 200, response.text
+    response = _add(client, https_endpoint, verify_tls=False)
+    assert response.status_code == 201, response.text
     assert response.json()["verify_tls"] is False
+    source_id = response.json()["id"]
+    assert client.get(f"/api/sources/{source_id}/buckets").status_code == 200
 
 
 def test_invalid_ca_cert_is_a_validation_error(client):
-    response = _connect(client, "https://127.0.0.1:1", ca_cert="not a certificate")
+    response = _add(client, "https://127.0.0.1:1", ca_cert="not a certificate")
     assert response.status_code == 422
     assert "ca_cert" in response.json()["message"]
     broken = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----"
-    assert _connect(client, "https://127.0.0.1:1", ca_cert=broken).status_code == 422
+    assert _add(client, "https://127.0.0.1:1", ca_cert=broken).status_code == 422
 
 
 def test_ca_bundle_keeps_public_cas_and_is_removed_on_close(ca, https_endpoint):
@@ -91,10 +96,10 @@ def test_ca_bundle_keeps_public_cas_and_is_removed_on_close(ca, https_endpoint):
     assert not bundle.exists()
 
 
-def test_session_cleanup_removes_ca_bundle(client, https_endpoint, ca):
-    _connect(client, https_endpoint, ca_cert=ca.cert_pem.bytes().decode())
-    session = next(iter(client.app.state.sessions._sessions.values()))
-    bundle = session.browser._ca_bundle
+def test_deleting_a_source_removes_its_ca_bundle(client, https_endpoint, ca):
+    source_id = _add(client, https_endpoint, ca_cert=ca.cert_pem.bytes().decode()).json()["id"]
+    client.get(f"/api/sources/{source_id}/buckets")  # builds and caches the client
+    bundle = client.app.state.clients.get(source_id)._ca_bundle
     assert bundle.exists()
-    client.delete("/api/session")
+    client.delete(f"/api/sources/{source_id}")
     assert not bundle.exists()

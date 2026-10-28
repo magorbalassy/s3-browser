@@ -3,7 +3,7 @@
   "input": "../backend/openapi.json",
   "output": "src/app/api",
   "ignoreUnusedModels": false,
-  "removeStaleFiles": true,
+  "removeStaleFiles": false,
   "indexFile": true,
   "skipJsonSuffix": true
 }

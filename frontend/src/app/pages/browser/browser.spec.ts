@@ -23,11 +23,12 @@ describe('Browser', () => {
     [...el().querySelectorAll('td.name-cell .name span')].map((n) => n.textContent?.trim());
 
   async function open(path: string, page: ObjectPage): Promise<void> {
+    fixture.componentRef.setInput('source', 'lab');
     fixture.componentRef.setInput('bucket', 'photos');
     fixture.componentRef.setInput('path', path);
     fixture.detectChanges();
     await settle();
-    const req = http.expectOne((r) => r.url === '/api/buckets/photos/objects');
+    const req = http.expectOne((r) => r.url === '/api/sources/lab/buckets/photos/objects');
     expect(req.request.params.get('prefix')).toBe(page.prefix);
     req.flush(page);
     await fixture.whenStable();
@@ -56,9 +57,11 @@ describe('Browser', () => {
     expect(el().querySelector('.summary')?.textContent).toContain('1 folder, 2 files');
     expect(el().textContent).toContain('2.00 KiB');
     const folderLink = el().querySelector('td.name-cell a') as HTMLAnchorElement;
-    expect(folderLink.getAttribute('href')).toBe('/b/photos/2024/jan');
+    expect(folderLink.getAttribute('href')).toBe('/s/lab/photos/2024/jan');
     const download = el().querySelector('a[download]') as HTMLAnchorElement;
-    expect(download.getAttribute('href')).toBe('/api/buckets/photos/download?key=2024%2Fa.jpg');
+    expect(download.getAttribute('href')).toBe(
+      '/api/sources/lab/buckets/photos/download?key=2024%2Fa.jpg',
+    );
     expect(el().querySelector('.load-more')).toBeNull();
   });
 
@@ -86,11 +89,12 @@ describe('Browser', () => {
   });
 
   it('shows the server error message', async () => {
+    fixture.componentRef.setInput('source', 'lab');
     fixture.componentRef.setInput('bucket', 'photos');
     fixture.detectChanges();
     await settle();
     http
-      .expectOne((r) => r.url === '/api/buckets/photos/objects')
+      .expectOne((r) => r.url === '/api/sources/lab/buckets/photos/objects')
       .flush(
         { code: 'bucket_not_found', message: 'Bucket not found.' },
         { status: 404, statusText: 'Not Found' },

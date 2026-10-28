@@ -12,3 +12,18 @@
   align-self: center;
   color: var(--mat-sys-on-surface-variant);
 }
+
+.subtitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .insecure {
+    color: var(--mat-sys-error);
+  }
+}
+
+.empty.error .actions {
+  display: flex;
+  gap: 8px;
+}

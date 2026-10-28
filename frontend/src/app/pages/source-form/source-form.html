@@ -1,0 +1,202 @@
+<mat-card appearance="outlined">
+  @if (busy()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  <mat-card-header>
+    <mat-icon mat-card-avatar class="avatar">storage</mat-icon>
+    <mat-card-title>{{ editing() ? 'Edit source' : 'Add an S3 source' }}</mat-card-title>
+    <mat-card-subtitle>AWS S3, MinIO, Ceph or any S3-compatible storage</mat-card-subtitle>
+  </mat-card-header>
+
+  @if (notFound()) {
+    <mat-card-content>
+      <div class="error" role="alert">
+        <mat-icon>error</mat-icon>
+        <span>This source does not exist (anymore).</span>
+      </div>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <a mat-flat-button routerLink="/sources">Back to sources</a>
+    </mat-card-actions>
+  } @else {
+    <form (submit)="onSave(); $event.preventDefault()" novalidate>
+      <mat-card-content>
+        @if (failure(); as f) {
+          <div class="error" role="alert">
+            <mat-icon>error</mat-icon>
+            <span>{{ f.error.message }}</span>
+          </div>
+        }
+        @if (testedBuckets() !== undefined) {
+          <div class="success" role="status">
+            <mat-icon>check_circle</mat-icon>
+            <span>
+              Connection works: {{ testedBuckets() }}
+              {{ testedBuckets() === 1 ? 'bucket' : 'buckets' }} visible.
+            </span>
+          </div>
+        }
+
+        <mat-form-field>
+          <mat-label>Name</mat-label>
+          <mat-icon matPrefix>label</mat-icon>
+          <input
+            matInput
+            [formField]="sourceForm.name"
+            placeholder="e.g. Production MinIO"
+            autocomplete="off"
+          />
+          @if (editing()) {
+            <mat-hint>Renaming keeps existing links working.</mat-hint>
+          }
+          @for (e of sourceForm.name().errors(); track e.kind) {
+            <mat-error>{{ e.message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Endpoint URL</mat-label>
+          <mat-icon matPrefix>dns</mat-icon>
+          <input
+            matInput
+            [formField]="sourceForm.endpoint"
+            placeholder="https://s3.example.com:9000"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <mat-hint>Leave empty for AWS S3. Without a scheme, https:// is used.</mat-hint>
+          @for (e of sourceForm.endpoint().errors(); track e.kind) {
+            <mat-error>{{ e.message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Access key</mat-label>
+          <mat-icon matPrefix>person</mat-icon>
+          <input
+            matInput
+            [formField]="sourceForm.accessKey"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          @for (e of sourceForm.accessKey().errors(); track e.kind) {
+            <mat-error>{{ e.message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Secret key</mat-label>
+          <mat-icon matPrefix>key</mat-icon>
+          <input
+            matInput
+            [type]="showSecret() ? 'text' : 'password'"
+            [formField]="sourceForm.secretKey"
+            [placeholder]="editing() ? 'Unchanged' : ''"
+            autocomplete="new-password"
+            spellcheck="false"
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="showSecret.set(!showSecret())"
+            [attr.aria-label]="showSecret() ? 'Hide secret key' : 'Show secret key'"
+          >
+            <mat-icon>{{ showSecret() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          @if (editing()) {
+            <mat-hint>Leave empty to keep the stored secret key.</mat-hint>
+          }
+          @for (e of sourceForm.secretKey().errors(); track e.kind) {
+            <mat-error>{{ e.message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Region</mat-label>
+          <mat-icon matPrefix>public</mat-icon>
+          <input matInput [formField]="sourceForm.region" spellcheck="false" />
+          <mat-hint>Most S3-compatible servers accept the default</mat-hint>
+          @for (e of sourceForm.region().errors(); track e.kind) {
+            <mat-error>{{ e.message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <fieldset class="tls">
+          <legend>TLS / certificates</legend>
+          @if (!tls()) {
+            <p class="tls-off">Not used for plain http:// endpoints.</p>
+          }
+          <mat-checkbox [formField]="sourceForm.skipTlsVerify">
+            Skip certificate verification
+          </mat-checkbox>
+          @if (model().skipTlsVerify && tls()) {
+            <div class="warning" role="note">
+              <mat-icon>warning</mat-icon>
+              <span>
+                The connection is still encrypted, but the server's identity is not checked. Only
+                use this for endpoints you trust.
+              </span>
+            </div>
+          } @else {
+            <mat-form-field>
+              <mat-label>Custom CA certificate (optional)</mat-label>
+              <textarea
+                matInput
+                class="pem"
+                rows="4"
+                [formField]="sourceForm.caCert"
+                placeholder="-----BEGIN CERTIFICATE-----"
+                spellcheck="false"
+              ></textarea>
+              <button
+                mat-icon-button
+                matSuffix
+                type="button"
+                [disabled]="!tls()"
+                (click)="caFile.click()"
+                aria-label="Load CA certificate from a file"
+              >
+                <mat-icon>upload_file</mat-icon>
+              </button>
+              <mat-hint>For self-signed or internal CAs. Paste the PEM or load a file.</mat-hint>
+              @for (e of sourceForm.caCert().errors(); track e.kind) {
+                <mat-error>{{ e.message }}</mat-error>
+              }
+            </mat-form-field>
+            <input
+              #caFile
+              type="file"
+              hidden
+              accept=".pem,.crt,.cer,.ca-bundle,application/x-pem-file"
+              (change)="loadCaFile(caFile)"
+            />
+          }
+        </fieldset>
+
+        <p class="note">
+          <mat-icon inline>lock</mat-icon>
+          Sources are stored on the server; the secret key is encrypted and never sent back to the
+          browser.
+        </p>
+      </mat-card-content>
+
+      <mat-card-actions align="end">
+        <a mat-button routerLink="/sources">Cancel</a>
+        <button mat-stroked-button type="button" (click)="onTest()" [disabled]="busy()">
+          <mat-icon>network_check</mat-icon>
+          Test connection
+        </button>
+        @if (failure()?.canForce) {
+          <button mat-stroked-button type="button" (click)="onSave(true)" [disabled]="busy()">
+            Save without testing
+          </button>
+        }
+        <button mat-flat-button type="submit" [disabled]="busy()">
+          <mat-icon>save</mat-icon>
+          {{ editing() ? 'Save' : 'Add source' }}
+        </button>
+      </mat-card-actions>
+    </form>
+  }
+</mat-card>

@@ -24,18 +24,21 @@ import { BytesPipe } from '../bytes-pipe';
 export class FolderSizeCell {
   private readonly sizes = inject(FolderSizes);
 
+  readonly source = input.required<string>();
   readonly bucket = input.required<string>();
   readonly prefix = input.required<string>();
   /** Show a labelled button instead of an icon (used for the current folder's total). */
   readonly labelled = input(false);
 
-  protected readonly state = computed(() => this.sizes.state(this.bucket(), this.prefix())());
+  protected readonly state = computed(() =>
+    this.sizes.state(this.source(), this.bucket(), this.prefix())(),
+  );
 
   protected start(): void {
-    this.sizes.start(this.bucket(), this.prefix());
+    this.sizes.start(this.source(), this.bucket(), this.prefix());
   }
 
   protected cancel(): void {
-    this.sizes.cancel(this.bucket(), this.prefix());
+    this.sizes.cancel(this.source(), this.bucket(), this.prefix());
   }
 }

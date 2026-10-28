@@ -1,25 +1,44 @@
 <mat-toolbar>
-  <a class="brand" routerLink="/b">
+  <a class="brand" routerLink="/">
     <mat-icon>cloud</mat-icon>
     <span>S3 Browser</span>
   </a>
 
-  @if (session.connected()) {
+  @if (store.sources().length) {
+    <mat-form-field class="picker source-select" subscriptSizing="dynamic">
+      <mat-icon matPrefix>storage</mat-icon>
+      <mat-select
+        placeholder="Select a source"
+        aria-label="Source"
+        [value]="sourceId()"
+        (selectionChange)="openSource($event.value)"
+      >
+        @for (s of store.sources(); track s.id) {
+          <mat-option [value]="s.id">{{ s.name }}</mat-option>
+        }
+        <mat-divider />
+        <mat-option [value]="manage">
+          <mat-icon>settings</mat-icon>
+          Manage sources…
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  }
+
+  @if (tls(); as t) {
     <span
       class="endpoint"
-      [class.insecure]="tls().insecure"
-      [matTooltip]="tls().tooltip"
-      [attr.aria-label]="session.endpointLabel() + '. ' + tls().tooltip"
+      [class.insecure]="t.insecure"
+      [matTooltip]="t.tooltip"
+      [attr.aria-label]="t.tooltip"
+      tabindex="0"
     >
-      <mat-icon>{{ tls().icon }}</mat-icon>
-      <span class="endpoint-label">{{ session.endpointLabel() }}</span>
+      <mat-icon>{{ t.icon }}</mat-icon>
     </span>
   }
 
-  <span class="spacer"></span>
-
-  @if (session.connected()) {
-    <mat-form-field class="bucket-select" subscriptSizing="dynamic">
+  @if (sourceId()) {
+    <mat-form-field class="picker bucket-select" subscriptSizing="dynamic">
       <mat-icon matPrefix>deployed_code</mat-icon>
       <mat-select
         placeholder="Select a bucket"
@@ -27,13 +46,18 @@
         [value]="bucket()"
         (selectionChange)="openBucket($event.value)"
       >
-        @for (name of session.buckets(); track name) {
+        @for (name of buckets(); track name) {
           <mat-option [value]="name">{{ name }}</mat-option>
         }
       </mat-select>
     </mat-form-field>
   }
 
+  <span class="spacer"></span>
+
+  <a mat-icon-button routerLink="/sources" matTooltip="Sources" aria-label="Sources">
+    <mat-icon>settings</mat-icon>
+  </a>
   <button
     mat-icon-button
     (click)="theme.cycle()"
@@ -42,10 +66,4 @@
   >
     <mat-icon>{{ theme.icon() }}</mat-icon>
   </button>
-
-  @if (session.connected()) {
-    <button mat-icon-button (click)="logout()" matTooltip="Disconnect" aria-label="Disconnect">
-      <mat-icon>logout</mat-icon>
-    </button>
-  }
 </mat-toolbar>

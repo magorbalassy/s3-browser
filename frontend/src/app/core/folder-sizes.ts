@@ -19,23 +19,23 @@ export class FolderSizes {
   private readonly states = new Map<string, WritableSignal<FolderSizeState | undefined>>();
   private readonly streams = new Map<string, EventSource>();
 
-  state(bucket: string, prefix: string): Signal<FolderSizeState | undefined> {
-    return this.slot(bucket, prefix).asReadonly();
+  state(source: string, bucket: string, prefix: string): Signal<FolderSizeState | undefined> {
+    return this.slot(source, bucket, prefix).asReadonly();
   }
 
-  start(bucket: string, prefix: string): void {
-    const key = keyOf(bucket, prefix);
+  start(source: string, bucket: string, prefix: string): void {
+    const key = keyOf(source, bucket, prefix);
     this.stop(key);
-    const state = this.slot(bucket, prefix);
+    const state = this.slot(source, bucket, prefix);
     state.set({ bytes: 0, objects: 0, done: false });
 
     const url =
-      `/api/buckets/${encodeURIComponent(bucket)}/size` +
+      `/api/sources/${encodeURIComponent(source)}/buckets/${encodeURIComponent(bucket)}/size` +
       (prefix ? `?prefix=${encodeURIComponent(prefix)}` : '');
-    const source = new EventSource(url);
-    this.streams.set(key, source);
+    const stream = new EventSource(url);
+    this.streams.set(key, stream);
 
-    source.onmessage = (event: MessageEvent<string>) => {
+    stream.onmessage = (event: MessageEvent<string>) => {
       const progress = JSON.parse(event.data) as SizeProgress;
       state.set({
         bytes: progress.bytes,
@@ -47,7 +47,7 @@ export class FolderSizes {
         this.stop(key);
       }
     };
-    source.onerror = () => {
+    stream.onerror = () => {
       // Fires on network loss or a non-200 reply (e.g. the session expired).
       state.update((s) => ({
         bytes: s?.bytes ?? 0,
@@ -59,23 +59,30 @@ export class FolderSizes {
     };
   }
 
-  cancel(bucket: string, prefix: string): void {
-    this.stop(keyOf(bucket, prefix));
-    this.slot(bucket, prefix).set(undefined);
+  cancel(source: string, bucket: string, prefix: string): void {
+    this.stop(keyOf(source, bucket, prefix));
+    this.slot(source, bucket, prefix).set(undefined);
   }
 
-  /** Drop everything, e.g. when disconnecting. */
-  clear(): void {
-    for (const key of [...this.streams.keys()]) {
+  /** Forget the sizes of one source (e.g. after it was edited), or of all sources. */
+  clear(source?: string): void {
+    const matches = (key: string) => source === undefined || key.startsWith(source + SEP);
+    for (const key of [...this.streams.keys()].filter(matches)) {
       this.stop(key);
     }
-    for (const state of this.states.values()) {
-      state.set(undefined);
+    for (const [key, state] of this.states) {
+      if (matches(key)) {
+        state.set(undefined);
+      }
     }
   }
 
-  private slot(bucket: string, prefix: string): WritableSignal<FolderSizeState | undefined> {
-    const key = keyOf(bucket, prefix);
+  private slot(
+    source: string,
+    bucket: string,
+    prefix: string,
+  ): WritableSignal<FolderSizeState | undefined> {
+    const key = keyOf(source, bucket, prefix);
     let state = this.states.get(key);
     if (!state) {
       state = signal<FolderSizeState | undefined>(undefined);
@@ -90,6 +97,8 @@ export class FolderSizes {
   }
 }
 
-function keyOf(bucket: string, prefix: string): string {
-  return `${bucket}\u0000${prefix}`;
+const SEP = '\u0000';
+
+function keyOf(source: string, bucket: string, prefix: string): string {
+  return [source, bucket, prefix].join(SEP);
 }

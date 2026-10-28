@@ -1,75 +1,71 @@
-import { computed, signal } from '@angular/core';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { FolderSizes } from '../../core/folder-sizes';
-import { SessionStore } from '../../core/session-store';
+import { Source } from '../../api/models';
+import { BucketsState, SourcesStore } from '../../core/sources-store';
+import { source } from '../../testing/fixtures';
 import { TopBar } from './top-bar';
 
 describe('TopBar', () => {
   let fixture: ComponentFixture<TopBar>;
-  const connected = signal(false);
-  const verifyTls = signal(true);
-  const session = {
-    connected,
-    info: computed(() =>
-      connected()
-        ? {
-            endpoint: '',
-            region: 'us-east-1',
-            verify_tls: verifyTls(),
-            custom_ca: false,
-            buckets: [],
-          }
-        : undefined,
-    ),
-    endpointLabel: () => 'AWS S3',
-    buckets: () => ['photos'],
-    disconnect: vi.fn().mockResolvedValue(undefined),
+  const sources = signal<Source[]>([]);
+  const buckets = signal<BucketsState | undefined>(undefined);
+  const store = {
+    sources,
+    load: vi.fn().mockResolvedValue(undefined),
+    bucketsOf: () => buckets,
+    loadBuckets: vi.fn(),
   };
-  const sizes = { clear: vi.fn() };
   const el = () => fixture.nativeElement as HTMLElement;
 
+  async function at(url: string): Promise<void> {
+    await TestBed.inject(Router).navigateByUrl(url);
+    await fixture.whenStable();
+  }
+
   beforeEach(async () => {
-    connected.set(false);
-    verifyTls.set(true);
+    sources.set([]);
+    buckets.set(undefined);
+    store.loadBuckets.mockClear();
     TestBed.configureTestingModule({
       imports: [TopBar],
       providers: [
-        provideRouter([]),
-        { provide: SessionStore, useValue: session },
-        { provide: FolderSizes, useValue: sizes },
+        provideRouter([{ path: '**', children: [] }]),
+        { provide: SourcesStore, useValue: store },
       ],
     });
-    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     fixture = TestBed.createComponent(TopBar);
     await fixture.whenStable();
   });
 
-  it('hides session controls until connected', async () => {
-    expect(el().querySelector('[aria-label=Disconnect]')).toBeNull();
-    connected.set(true);
-    await fixture.whenStable();
-    expect(el().textContent).toContain('AWS S3');
-    expect(el().querySelector('mat-select')).toBeTruthy();
+  it('shows no pickers before any source exists', () => {
+    expect(el().querySelector('mat-select')).toBeNull();
+    expect(el().querySelector('[aria-label=Sources]')).toBeTruthy();
   });
 
-  it('flags connections without TLS verification', async () => {
-    connected.set(true);
-    await fixture.whenStable();
-    expect(el().querySelector('.endpoint.insecure')).toBeNull();
-    verifyTls.set(false);
-    await fixture.whenStable();
+  it('shows the source picker, and the bucket picker inside a source', async () => {
+    sources.set([source('lab', 'Lab MinIO')]);
+    await at('/sources');
+    expect(el().querySelectorAll('mat-select').length).toBe(1);
+
+    buckets.set({ loading: false, buckets: ['photos'] });
+    await at('/s/lab/photos');
+    expect(el().querySelectorAll('mat-select').length).toBe(2);
+    expect(store.loadBuckets).toHaveBeenCalledWith('lab');
+    expect(el().textContent).toContain('Lab MinIO');
+  });
+
+  it('flags sources without TLS verification', async () => {
+    sources.set([source('lab', 'Lab', { endpoint: 'https://x', verify_tls: false })]);
+    await at('/s/lab');
     const badge = el().querySelector('.endpoint.insecure');
     expect(badge?.getAttribute('aria-label')).toContain('TLS verification is off');
   });
 
-  it('disconnects and clears cached sizes', async () => {
-    connected.set(true);
-    await fixture.whenStable();
-    (el().querySelector('[aria-label=Disconnect]') as HTMLButtonElement).click();
-    await fixture.whenStable();
-    expect(sizes.clear).toHaveBeenCalled();
-    expect(session.disconnect).toHaveBeenCalled();
-    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/connect']);
+  it('shows a custom CA as trusted', async () => {
+    sources.set([source('lab', 'Lab', { endpoint: 'https://x', ca_cert: 'PEM' })]);
+    await at('/s/lab');
+    expect(el().querySelector('.endpoint.insecure')).toBeNull();
+    expect(el().querySelector('.endpoint')?.getAttribute('aria-label')).toContain('custom CA');
   });
 });

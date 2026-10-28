@@ -123,7 +123,7 @@ def serve(
     port: Annotated[int, typer.Option(envvar="PORT")] = 8080,
     reload: bool = False,
 ) -> None:
-    """Run the web UI and API (single worker: sessions are kept in memory)."""
+    """Run the web UI and API."""
     import uvicorn
 
     uvicorn.run(
@@ -135,8 +135,12 @@ def serve(
 def openapi() -> None:
     """Print the API's OpenAPI schema (used to generate the frontend's types)."""
     import json
+    import tempfile
 
     from .config import Settings
     from .main import create_app
 
-    typer.echo(json.dumps(create_app(Settings()).openapi(), indent=2))
+    # The schema doesn't depend on data, so build the app on a throwaway data directory.
+    with tempfile.TemporaryDirectory() as data_dir:
+        app = create_app(Settings(data_dir=Path(data_dir)))
+        typer.echo(json.dumps(app.openapi(), indent=2))

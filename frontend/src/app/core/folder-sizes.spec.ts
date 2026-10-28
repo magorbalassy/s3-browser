@@ -33,10 +33,10 @@ describe('FolderSizes', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('streams progress until done, then closes the connection', () => {
-    const state = sizes.state('photos', '2024/');
-    sizes.start('photos', '2024/');
+    const state = sizes.state('lab', 'photos', '2024/');
+    sizes.start('lab', 'photos', '2024/');
     const source = FakeEventSource.instances[0];
-    expect(source.url).toBe('/api/buckets/photos/size?prefix=2024%2F');
+    expect(source.url).toBe('/api/sources/lab/buckets/photos/size?prefix=2024%2F');
     expect(state()).toEqual({ bytes: 0, objects: 0, done: false });
 
     source.emit({ bytes: 100, objects: 1, done: false, error: null });
@@ -48,22 +48,22 @@ describe('FolderSizes', () => {
   });
 
   it('reports server-side errors', () => {
-    sizes.start('nope', '');
+    sizes.start('lab', 'nope', '');
     FakeEventSource.instances[0].emit({
       bytes: 0,
       objects: 0,
       done: true,
       error: { code: 'bucket_not_found', message: 'Bucket not found.' },
     });
-    expect(sizes.state('nope', '')()?.error).toBe('Bucket not found.');
+    expect(sizes.state('lab', 'nope', '')()?.error).toBe('Bucket not found.');
   });
 
   it('marks a dropped connection as an error but keeps the partial total', () => {
-    sizes.start('photos', '');
+    sizes.start('lab', 'photos', '');
     const source = FakeEventSource.instances[0];
     source.emit({ bytes: 50, objects: 5, done: false, error: null });
     source.onerror?.();
-    expect(sizes.state('photos', '')()).toEqual({
+    expect(sizes.state('lab', 'photos', '')()).toEqual({
       bytes: 50,
       objects: 5,
       done: true,
@@ -73,14 +73,22 @@ describe('FolderSizes', () => {
   });
 
   it('cancels and clears', () => {
-    sizes.start('photos', 'a/');
-    sizes.cancel('photos', 'a/');
+    sizes.start('lab', 'photos', 'a/');
+    sizes.cancel('lab', 'photos', 'a/');
     expect(FakeEventSource.instances[0].closed).toBe(true);
-    expect(sizes.state('photos', 'a/')()).toBeUndefined();
+    expect(sizes.state('lab', 'photos', 'a/')()).toBeUndefined();
 
-    sizes.start('photos', 'b/');
+    sizes.start('lab', 'photos', 'b/');
     sizes.clear();
     expect(FakeEventSource.instances[1].closed).toBe(true);
-    expect(sizes.state('photos', 'b/')()).toBeUndefined();
+    expect(sizes.state('lab', 'photos', 'b/')()).toBeUndefined();
+  });
+
+  it('clears only the given source', () => {
+    sizes.start('lab', 'photos', '');
+    sizes.start('prod', 'photos', '');
+    sizes.clear('lab');
+    expect(sizes.state('lab', 'photos', '')()).toBeUndefined();
+    expect(sizes.state('prod', 'photos', '')()).toBeDefined();
   });
 });

@@ -35,7 +35,8 @@ mat-form-field {
   width: 100%;
 }
 
-.error {
+.error,
+.success {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -102,4 +103,18 @@ mat-form-field {
   margin: 0;
   color: var(--mat-sys-on-surface-variant);
   font: var(--mat-sys-body-small);
+}
+
+.success {
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+
+  mat-icon {
+    flex: none;
+  }
+}
+
+mat-card-actions {
+  flex-wrap: wrap;
+  gap: 8px;
 }

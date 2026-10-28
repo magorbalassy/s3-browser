@@ -6,15 +6,38 @@ from datetime import datetime
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 
-class ConnectRequest(BaseModel):
+def _check_endpoint(value: str) -> str:
+    value = value.strip().rstrip("/")
+    if value and not value.startswith(("http://", "https://")):
+        raise ValueError("endpoint must start with http:// or https://")
+    return value
+
+
+def _check_ca_cert(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+    if "-----BEGIN CERTIFICATE-----" not in value:
+        raise ValueError("must be a PEM certificate (-----BEGIN CERTIFICATE-----)")
+    try:
+        ssl.create_default_context(cadata=value)
+    except (ssl.SSLError, ValueError) as exc:
+        raise ValueError("is not a valid PEM certificate") from exc
+    return value + "\n"
+
+
+class SourceIn(BaseModel):
+    """A source to create or update. Leave `secret_key` out on update to keep the stored one."""
+
+    name: str = Field(min_length=1, max_length=100)
     endpoint: str = Field(
         default="",
-        description="S3 endpoint URL, e.g. http://minio:9000. Empty means AWS S3.",
+        description="S3 endpoint URL, e.g. https://minio:9000. Empty means AWS S3.",
         max_length=2048,
     )
-    access_key: str = Field(min_length=1, max_length=256)
-    secret_key: SecretStr = Field(min_length=1, max_length=256)
     region: str = Field(default="us-east-1", min_length=1, max_length=64)
+    access_key: str = Field(min_length=1, max_length=256)
+    secret_key: SecretStr | None = Field(default=None, min_length=1, max_length=256)
     verify_tls: bool = Field(
         default=True,
         description="Verify the endpoint's TLS certificate. Disable only for trusted endpoints.",
@@ -25,35 +48,47 @@ class ConnectRequest(BaseModel):
         max_length=65536,
     )
 
-    @field_validator("ca_cert")
+    @field_validator("name")
     @classmethod
-    def check_ca_cert(cls, value: str) -> str:
-        value = value.strip()
+    def check_name(cls, value: str) -> str:
+        value = " ".join(value.split())
         if not value:
-            return ""
-        if "-----BEGIN CERTIFICATE-----" not in value:
-            raise ValueError("must be a PEM certificate (-----BEGIN CERTIFICATE-----)")
-        try:
-            ssl.create_default_context(cadata=value)
-        except (ssl.SSLError, ValueError) as exc:
-            raise ValueError("is not a valid PEM certificate") from exc
-        return value + "\n"
+            raise ValueError("name must not be empty")
+        return value
 
     @field_validator("endpoint")
     @classmethod
     def check_endpoint(cls, value: str) -> str:
-        value = value.strip().rstrip("/")
-        if value and not value.startswith(("http://", "https://")):
-            raise ValueError("endpoint must start with http:// or https://")
-        return value
+        return _check_endpoint(value)
+
+    @field_validator("ca_cert")
+    @classmethod
+    def check_ca_cert(cls, value: str) -> str:
+        return _check_ca_cert(value)
 
 
-class SessionInfo(BaseModel):
+class Source(BaseModel):
+    """A saved source. The secret key is write-only and never returned."""
+
+    id: str = Field(description="Stable, URL-safe identifier (used in /s/<id>/...).")
+    name: str
     endpoint: str
     region: str
+    access_key: str
     verify_tls: bool
-    custom_ca: bool = Field(description="A custom CA certificate is in use.")
-    buckets: list[str]
+    ca_cert: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SourceList(BaseModel):
+    sources: list[Source]
+
+
+class ConnectionTest(BaseModel):
+    ok: bool
+    buckets: list[str] = Field(default_factory=list)
+    error: "ErrorResponse | None" = None
 
 
 class BucketList(BaseModel):
